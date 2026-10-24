@@ -11,15 +11,25 @@ export function FixPath():Promise<core.PathStatus>;
 
 export function FullCleanup(arg1:Record<string, any>):Promise<core.CleanupResult>;
 
+export function GetComposerGlobalPackages():Promise<Array<core.ComposerGlobalPackage>>;
+
+export function GetComposerStatus():Promise<core.ComposerStatus>;
+
 export function GetDirectives(arg1:string):Promise<Record<string, string>>;
 
 export function GetExtensions(arg1:string):Promise<Array<core.ExtensionInfo>>;
 
 export function GetState():Promise<main.StateResult>;
 
+export function InstallComposer():Promise<core.ComposerOperationResult>;
+
+export function InstallComposerGlobalPackage(arg1:Record<string, any>):Promise<core.ComposerOperationResult>;
+
 export function InstallVersion(arg1:Record<string, any>):Promise<core.InstallResult>;
 
 export function OpenFolder(arg1:string):Promise<boolean>;
+
+export function RemoveComposerGlobalPackage(arg1:Record<string, any>):Promise<core.ComposerOperationResult>;
 
 export function RemovePath():Promise<core.PathStatus>;
 
@@ -27,7 +37,15 @@ export function SetExtensionStatus(arg1:Record<string, any>):Promise<Array<core.
 
 export function SwitchVersion(arg1:string):Promise<main.SwitchResult>;
 
+export function ToggleComposerGlobalBinPath(arg1:Record<string, any>):Promise<boolean>;
+
+export function UninstallComposer(arg1:Record<string, any>):Promise<core.ComposerUninstallResult>;
+
 export function UninstallVersion(arg1:Record<string, any>):Promise<core.UninstallResult>;
+
+export function UpdateComposer():Promise<core.ComposerOperationResult>;
+
+export function UpdateComposerGlobalPackage(arg1:Record<string, any>):Promise<core.ComposerOperationResult>;
 
 export function UpdateDirectives(arg1:Record<string, any>):Promise<boolean>;
 

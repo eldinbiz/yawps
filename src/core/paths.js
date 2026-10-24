@@ -16,6 +16,7 @@ const BASE_DIR = customHome
 const VERSIONS_DIR = path.join(BASE_DIR, 'versions');
 const CURRENT_LINK = path.join(BASE_DIR, 'current');
 const DOWNLOADS_DIR = path.join(BASE_DIR, 'downloads');
+const BIN_DIR = path.join(BASE_DIR, 'bin');
 const CONFIG_FILE = path.join(BASE_DIR, 'config.json');
 
 /**
@@ -24,6 +25,9 @@ const CONFIG_FILE = path.join(BASE_DIR, 'config.json');
 function ensureDirectories() {
   if (!fs.existsSync(BASE_DIR)) {
     fs.mkdirSync(BASE_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(BIN_DIR)) {
+    fs.mkdirSync(BIN_DIR, { recursive: true });
   }
   if (!fs.existsSync(VERSIONS_DIR)) {
     fs.mkdirSync(VERSIONS_DIR, { recursive: true });
@@ -65,6 +69,7 @@ module.exports = {
   VERSIONS_DIR,
   CURRENT_LINK,
   DOWNLOADS_DIR,
+  BIN_DIR,
   CONFIG_FILE,
   ensureDirectories,
   getConfig,

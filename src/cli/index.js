@@ -41,6 +41,17 @@ const {
   fullCleanup
 } = require('../core/uninstaller');
 
+const {
+  getComposerStatus,
+  installComposer,
+  updateComposer,
+  uninstallComposer,
+  getComposerGlobalPackages,
+  installComposerGlobalPackage,
+  removeComposerGlobalPackage,
+  updateComposerGlobalPackage
+} = require('../core/composer');
+
 const { getWindowsVersionInfo } = require('../core/osCheck');
 
 const readline = require('readline');
@@ -525,7 +536,184 @@ function createCli() {
       }
     });
 
-  // 11. GUI / UI
+  // 11. COMPOSER
+  const composerCmd = program
+    .command('composer')
+    .description('Manage Composer installation and global PHP packages')
+    .action(async () => {
+      try {
+        const status = await getComposerStatus();
+        console.log(pc.bold(pc.cyan('\n🎼 Composer Status:\n')));
+        if (status.installed) {
+          console.log(`  ${pc.bold('Status:')}          ${pc.green('Installed')}`);
+          console.log(`  ${pc.bold('Version:')}         ${status.version} (${status.releaseDate || 'official'})`);
+          if (status.isUpToDate) {
+            console.log(`  ${pc.bold('Up to Date:')}      ${pc.green('✔ Yes')} (latest stable: ${status.latestVersion})`);
+          } else if (status.latestVersion) {
+            console.log(`  ${pc.bold('Up to Date:')}      ${pc.yellow('▲ Update available:')} ${status.latestVersion} (run 'yawps composer update')`);
+          }
+          console.log(`  ${pc.bold('Executable:')}      ${pc.gray(status.location || status.pharPath)}`);
+          console.log(`  ${pc.bold('Active PHP:')}      ${status.activePhp || 'None'}`);
+          console.log(`  ${pc.bold('Global Packages:')} ${status.packagesCount} installed`);
+          console.log(`  ${pc.bold('Global Bin:')}      ${pc.gray(status.globalBinDir)}\n`);
+        } else {
+          console.log(`  ${pc.bold('Status:')}          ${pc.red('Not Installed')}`);
+          if (status.latestVersion) {
+            console.log(`  ${pc.bold('Latest Release:')}  ${status.latestVersion}`);
+          }
+          console.log(pc.gray(`\nRun ${pc.cyan('yawps composer install')} to download and set up Composer.\n`));
+        }
+      } catch (err) {
+        console.error(pc.red(`\n❌ Error querying Composer: ${err.message}\n`));
+      }
+    });
+
+  composerCmd
+    .command('status')
+    .description('Check if Composer is installed and up to date')
+    .action(async () => {
+      const status = await getComposerStatus();
+      console.log(pc.bold(pc.cyan('\n🎼 Composer Status:\n')));
+      if (status.installed) {
+        console.log(`  ${pc.bold('Status:')}          ${pc.green('Installed')}`);
+        console.log(`  ${pc.bold('Version:')}         ${status.version} (${status.releaseDate || 'official'})`);
+        if (status.isUpToDate) {
+          console.log(`  ${pc.bold('Up to Date:')}      ${pc.green('✔ Yes')} (latest stable: ${status.latestVersion})`);
+        } else if (status.latestVersion) {
+          console.log(`  ${pc.bold('Up to Date:')}      ${pc.yellow('▲ Update available:')} ${status.latestVersion} (run 'yawps composer update')`);
+        }
+        console.log(`  ${pc.bold('Executable:')}      ${pc.gray(status.location || status.pharPath)}`);
+        console.log(`  ${pc.bold('Active PHP:')}      ${status.activePhp || 'None'}`);
+        console.log(`  ${pc.bold('Global Packages:')} ${status.packagesCount} installed\n`);
+      } else {
+        console.log(`  ${pc.bold('Status:')}          ${pc.red('Not Installed')}`);
+        if (status.latestVersion) {
+          console.log(`  ${pc.bold('Latest Release:')}  ${status.latestVersion}`);
+        }
+        console.log(pc.gray(`\nRun ${pc.cyan('yawps composer install')} to download and set up Composer.\n`));
+      }
+    });
+
+  composerCmd
+    .command('install')
+    .description('Download and set up Composer cleanly in YAWPS')
+    .action(async () => {
+      try {
+        console.log(pc.cyan('\n⏳ Downloading and installing official Composer...'));
+        const res = await installComposer((p) => {
+          if (p.message) {
+            process.stdout.write(`\r[${p.percent || 0}%] ${p.message}   `);
+          }
+        });
+        console.log('');
+        console.log(pc.bold(pc.green('✔ Composer installed successfully!')));
+        if (res.output) console.log(res.output);
+        console.log('');
+      } catch (err) {
+        console.error(pc.red(`\n❌ Installation failed: ${err.message}\n`));
+      }
+    });
+
+  composerCmd
+    .command('update')
+    .description('Update Composer to latest stable release')
+    .action(async () => {
+      try {
+        console.log(pc.cyan('\n⏳ Updating Composer...'));
+        const res = await updateComposer((p) => {
+          if (p.message) {
+            process.stdout.write(`\r[${p.percent || 0}%] ${p.message}   `);
+          }
+        });
+        console.log('');
+        console.log(pc.bold(pc.green('✔ Composer updated successfully!')));
+        if (res.output) console.log(res.output);
+        console.log('');
+      } catch (err) {
+        console.error(pc.red(`\n❌ Update failed: ${err.message}\n`));
+      }
+    });
+
+  composerCmd
+    .command('packages')
+    .alias('list')
+    .description('List globally installed PHP packages')
+    .action(() => {
+      const pkgs = getComposerGlobalPackages();
+      if (pkgs.length === 0) {
+        console.log(pc.yellow('\nNo global Composer packages installed.'));
+        console.log(pc.gray(`Run ${pc.cyan('yawps composer require <vendor/package>')} to install a tool.\n`));
+        return;
+      }
+      console.log(pc.bold(pc.cyan(`\n📦 Globally Installed PHP Packages (${pkgs.length}):\n`)));
+      for (const p of pkgs) {
+        console.log(`  • ${pc.bold(p.name)} ${pc.green(p.version)} ${p.constraint ? pc.cyan('[' + p.constraint + ']') : ''}`);
+        if (p.description) console.log(`    ${pc.gray(p.description)}`);
+        if (p.binaries && p.binaries.length > 0) console.log(`    ${pc.yellow('CLI:')} ${p.binaries.join(', ')}`);
+      }
+      console.log('');
+    });
+
+  composerCmd
+    .command('require <package>')
+    .alias('add')
+    .description('Require and install a global PHP package')
+    .option('-v, --pkg-version <version>', 'Version constraint (e.g. ^5.0)')
+    .action(async (pkg, options) => {
+      try {
+        console.log(pc.cyan(`\n⏳ Requiring global package ${pkg}...`));
+        const res = await installComposerGlobalPackage(pkg, options.pkgVersion, (line) => {
+          console.log(`  ${pc.gray(line)}`);
+        });
+        if (res.success) {
+          console.log(pc.bold(pc.green(`✔ Package ${pkg} installed successfully!\n`)));
+        } else {
+          console.error(pc.red(`\n❌ Failed: ${res.output}\n`));
+        }
+      } catch (err) {
+        console.error(pc.red(`\n❌ Failed: ${err.message}\n`));
+      }
+    });
+
+  composerCmd
+    .command('remove <package>')
+    .description('Remove a globally installed PHP package')
+    .action(async (pkg) => {
+      try {
+        console.log(pc.cyan(`\n⏳ Removing global package ${pkg}...`));
+        const res = await removeComposerGlobalPackage(pkg, (line) => {
+          console.log(`  ${pc.gray(line)}`);
+        });
+        if (res.success) {
+          console.log(pc.bold(pc.green(`✔ Package ${pkg} removed successfully!\n`)));
+        } else {
+          console.error(pc.red(`\n❌ Failed: ${res.output}\n`));
+        }
+      } catch (err) {
+        console.error(pc.red(`\n❌ Failed: ${err.message}\n`));
+      }
+    });
+
+  composerCmd
+    .command('uninstall')
+    .description('Cleanly remove installed Composer')
+    .option('--purge-packages', 'Also purge global packages and vendor')
+    .action(async (options) => {
+      try {
+        const res = uninstallComposer({
+          removeBin: true,
+          removeFromPath: true,
+          cleanCache: true,
+          purgePackages: options.purgePackages || false,
+          removeGlobalBinFromPath: false
+        });
+        console.log(pc.bold(pc.green(`\n✔ ${res.message}\n`)));
+      } catch (err) {
+        console.error(pc.red(`\n❌ Failed to remove Composer: ${err.message}\n`));
+      }
+    });
+
+  // 12. GUI / UI
   program
     .command('gui')
     .alias('ui')

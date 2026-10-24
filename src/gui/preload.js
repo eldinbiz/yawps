@@ -17,6 +17,17 @@ contextBridge.exposeInMainWorld('api', {
   fullCleanup: (options) => ipcRenderer.invoke('full-cleanup', options),
   openFolder: (path) => ipcRenderer.invoke('open-folder', path),
 
+  // Composer integration
+  getComposerStatus: () => ipcRenderer.invoke('get-composer-status'),
+  installComposer: () => ipcRenderer.invoke('install-composer'),
+  updateComposer: () => ipcRenderer.invoke('update-composer'),
+  uninstallComposer: (options) => ipcRenderer.invoke('uninstall-composer', options),
+  getComposerGlobalPackages: () => ipcRenderer.invoke('get-composer-global-packages'),
+  installComposerGlobalPackage: (payload) => ipcRenderer.invoke('install-composer-global-package', payload),
+  removeComposerGlobalPackage: (payload) => ipcRenderer.invoke('remove-composer-global-package', payload),
+  updateComposerGlobalPackage: (payload) => ipcRenderer.invoke('update-composer-global-package', payload),
+  toggleComposerGlobalBinPath: (payload) => ipcRenderer.invoke('toggle-composer-global-bin-path', payload),
+
   onInstallProgress: (callback) => {
     const handler = (event, data) => callback(data);
     ipcRenderer.on('install-progress', handler);
@@ -26,5 +37,15 @@ contextBridge.exposeInMainWorld('api', {
     const handler = (event, data) => callback(data);
     ipcRenderer.on('update-progress', handler);
     return () => ipcRenderer.removeListener('update-progress', handler);
+  },
+  onComposerProgress: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('composer-progress', handler);
+    return () => ipcRenderer.removeListener('composer-progress', handler);
+  },
+  onComposerLog: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('composer-log', handler);
+    return () => ipcRenderer.removeListener('composer-log', handler);
   }
 });

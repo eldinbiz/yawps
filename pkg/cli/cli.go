@@ -59,6 +59,10 @@ func Run(args []string) bool {
 		handleCleanup(args[1:])
 		return true
 
+	case "composer":
+		handleComposer(args[1:])
+		return true
+
 	case "uninstall", "remove":
 		handleUninstall(args[1:])
 		return true
@@ -372,6 +376,151 @@ func handleCleanup(args []string) {
 	fmt.Println("")
 }
 
+func handleComposer(args []string) {
+	sub := "status"
+	if len(args) > 0 {
+		sub = strings.ToLower(args[0])
+	}
+
+	switch sub {
+	case "status", "info":
+		status, err := core.GetComposerStatus()
+		if err != nil {
+			fmt.Printf("Error checking Composer: %v\n", err)
+			return
+		}
+		fmt.Println("\n🎼 Composer Status:")
+		if status.Installed {
+			fmt.Printf("  Status:          Installed\n")
+			fmt.Printf("  Version:         %s (%s)\n", status.Version, status.ReleaseDate)
+			if status.IsUpToDate {
+				fmt.Printf("  Up to Date:      ✔ Yes (latest: %s)\n", status.LatestVersion)
+			} else if status.LatestVersion != "" {
+				fmt.Printf("  Up to Date:      ▲ Update Available: %s (run 'yawps composer update')\n", status.LatestVersion)
+			}
+			fmt.Printf("  Executable:      %s\n", status.Location)
+			fmt.Printf("  Active PHP:      %s\n", status.ActivePhp)
+			fmt.Printf("  Global Packages: %d installed\n", status.PackagesCount)
+			fmt.Printf("  Global Bin:      %s\n", status.GlobalBinDir)
+		} else {
+			fmt.Println("  Status: Not Installed")
+			if status.LatestVersion != "" {
+				fmt.Printf("  Latest Release:  %s\n", status.LatestVersion)
+			}
+			fmt.Println("\nRun 'yawps composer install' to download and set up Composer.")
+		}
+		fmt.Println("")
+
+	case "install":
+		fmt.Println("\n⏳ Downloading and installing Composer...")
+		res, err := core.InstallComposer(func(p core.ProgressInfo) {
+			if p.Percent > 0 {
+				fmt.Printf("\r[%3d%%] %s", p.Percent, p.Message)
+			}
+		})
+		fmt.Println("")
+		if err != nil {
+			fmt.Printf("❌ Failed to install Composer: %v\n", err)
+			return
+		}
+		fmt.Println("✔ Composer installed successfully!")
+		if res.Output != "" {
+			fmt.Println(res.Output)
+		}
+		fmt.Println("")
+
+	case "update":
+		fmt.Println("\n⏳ Updating Composer...")
+		res, err := core.UpdateComposer(func(p core.ProgressInfo) {
+			if p.Percent > 0 {
+				fmt.Printf("\r[%3d%%] %s", p.Percent, p.Message)
+			}
+		})
+		fmt.Println("")
+		if err != nil {
+			fmt.Printf("❌ Failed to update Composer: %v\n", err)
+			return
+		}
+		fmt.Println("✔ Composer updated successfully!")
+		if res.Output != "" {
+			fmt.Println(res.Output)
+		}
+		fmt.Println("")
+
+	case "packages", "list", "pkgs":
+		packages, err := core.GetComposerGlobalPackages()
+		if err != nil {
+			fmt.Printf("Error fetching packages: %v\n", err)
+			return
+		}
+		if len(packages) == 0 {
+			fmt.Println("\nNo global Composer packages installed.")
+			fmt.Println("Install one using: yawps composer require <vendor/package>")
+			return
+		}
+		fmt.Printf("\n📦 Globally Installed Composer Packages (%d):\n", len(packages))
+		for _, p := range packages {
+			fmt.Printf("  • %-30s %-12s %s\n", p.Name, p.Version, p.Description)
+		}
+		fmt.Println("")
+
+	case "require", "add":
+		if len(args) < 2 {
+			fmt.Println("Usage: yawps composer require <package-name>")
+			return
+		}
+		pkg := args[1]
+		fmt.Printf("\n⏳ Installing global package %s...\n", pkg)
+		res, err := core.InstallComposerGlobalPackage(pkg, "", func(line string) {
+			fmt.Println("  " + line)
+		})
+		if err != nil || !res.Success {
+			fmt.Printf("❌ Failed: %v\n", err)
+			return
+		}
+		fmt.Printf("✔ Package %s installed globally!\n\n", pkg)
+
+	case "remove":
+		if len(args) < 2 {
+			fmt.Println("Usage: yawps composer remove <package-name>")
+			return
+		}
+		pkg := args[1]
+		fmt.Printf("\n⏳ Removing global package %s...\n", pkg)
+		res, err := core.RemoveComposerGlobalPackage(pkg, func(line string) {
+			fmt.Println("  " + line)
+		})
+		if err != nil || !res.Success {
+			fmt.Printf("❌ Failed: %v\n", err)
+			return
+		}
+		fmt.Printf("✔ Package %s removed globally!\n\n", pkg)
+
+	case "uninstall", "clean-uninstall":
+		opts := core.ComposerUninstallOptions{
+			RemoveBin:               true,
+			RemoveFromPath:          true,
+			CleanCache:              true,
+			PurgePackages:           false,
+			RemoveGlobalBinFromPath: false,
+		}
+		for _, a := range args[1:] {
+			if a == "--purge-packages" || a == "--all" {
+				opts.PurgePackages = true
+			}
+		}
+		res, err := core.UninstallComposer(opts)
+		if err != nil {
+			fmt.Printf("❌ Error removing Composer: %v\n", err)
+			return
+		}
+		fmt.Printf("\n✔ %s\n\n", res.Message)
+
+	default:
+		fmt.Printf("Unknown composer command: %s\nAvailable: status, install, update, packages, require, remove, uninstall\n", sub)
+	}
+}
+
 func printHelp() {
 	fmt.Print(`
 ⚡ YAWPS - Yet Another Windows PHP Switcher
@@ -388,6 +537,13 @@ Commands:
   ext list [version]                    List available extensions
   ext enable <ext> [version]            Enable an extension in php.ini
   ext disable <ext> [version]           Disable an extension in php.ini
+  composer status                       Check if Composer is installed and up to date
+  composer install                      Cleanly install Composer (latest stable)
+  composer update                       Update Composer to latest release
+  composer packages                     List globally installed PHP packages
+  composer require <pkg>                Install a global PHP package
+  composer remove <pkg>                 Remove a globally installed PHP package
+  composer uninstall [--purge-packages] Remove Composer cleanly
   env check                             Check PATH and junction health
   env fix                               Add YAWPS current junction to User PATH
   env remove                            Remove from User PATH

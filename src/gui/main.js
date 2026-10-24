@@ -44,6 +44,18 @@ const {
   fullCleanup
 } = require('../core/uninstaller');
 
+const {
+  getComposerStatus,
+  installComposer,
+  updateComposer,
+  uninstallComposer,
+  getComposerGlobalPackages,
+  installComposerGlobalPackage,
+  removeComposerGlobalPackage,
+  updateComposerGlobalPackage,
+  toggleComposerGlobalBinPath
+} = require('../core/composer');
+
 const { CURRENT_LINK, VERSIONS_DIR } = require('../core/paths');
 
 let mainWindow = null;
@@ -205,4 +217,61 @@ ipcMain.handle('remove-path', async () => {
 // 13. Full cleanup
 ipcMain.handle('full-cleanup', async (event, { purgeAll }) => {
   return fullCleanup({ purgeAll });
+});
+
+// 14. Composer
+ipcMain.handle('get-composer-status', async () => {
+  return getComposerStatus();
+});
+
+ipcMain.handle('install-composer', async (event) => {
+  return installComposer((p) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('composer-progress', p);
+    }
+  });
+});
+
+ipcMain.handle('update-composer', async (event) => {
+  return updateComposer((p) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('composer-progress', p);
+    }
+  });
+});
+
+ipcMain.handle('uninstall-composer', async (event, options) => {
+  return uninstallComposer(options);
+});
+
+ipcMain.handle('get-composer-global-packages', async () => {
+  return getComposerGlobalPackages();
+});
+
+ipcMain.handle('install-composer-global-package', async (event, payload = {}) => {
+  return installComposerGlobalPackage(payload.packageName, payload.version, (line) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('composer-log', { text: line });
+    }
+  });
+});
+
+ipcMain.handle('remove-composer-global-package', async (event, payload = {}) => {
+  return removeComposerGlobalPackage(payload.packageName, (line) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('composer-log', { text: line });
+    }
+  });
+});
+
+ipcMain.handle('update-composer-global-package', async (event, payload = {}) => {
+  return updateComposerGlobalPackage(payload.packageName, (line) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('composer-log', { text: line });
+    }
+  });
+});
+
+ipcMain.handle('toggle-composer-global-bin-path', async (event, payload = {}) => {
+  return toggleComposerGlobalBinPath(payload.enable);
 });

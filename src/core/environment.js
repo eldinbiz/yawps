@@ -178,49 +178,75 @@ function checkPathStatus() {
 }
 
 /**
- * Add CURRENT_LINK to Windows User PATH (prepended so it has priority)
+ * Check if directory is in User PATH
  */
-function addToUserPath() {
+function isDirectoryInUserPath(targetDir) {
+  if (!targetDir) return false;
+  const psCommand = `[Environment]::GetEnvironmentVariable('Path', 'User')`;
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', psCommand], {
+    windowsHide: true,
+    encoding: 'utf8'
+  });
+  const userPath = (result.stdout || '').trim();
+  const normalizedTarget = path.resolve(targetDir).toLowerCase();
+  const paths = userPath.split(';').map(p => p.trim()).filter(Boolean);
+  return paths.some(p => path.resolve(p).toLowerCase() === normalizedTarget);
+}
+
+/**
+ * Add directory to Windows User PATH
+ */
+function addDirectoryToUserPath(targetDir) {
+  if (!targetDir) return false;
+  const normalized = path.resolve(targetDir);
   const psScript = `
-    $current = "${CURRENT_LINK}";
+    $target = "${normalized.replace(/\\/g, '\\\\')}";
     $oldPath = [Environment]::GetEnvironmentVariable('Path', 'User');
-    $parts = $oldPath -split ';' | Where-Object { $_ -ne '' -and $_ -ne $current -and $_ -ne 'System.Object[]' };
-    $newPath = (@($current) + @($parts)) -join ';';
+    $parts = $oldPath -split ';' | Where-Object { $_ -ne '' -and $_ -ne $target -and $_ -ne 'System.Object[]' };
+    $newPath = (@($target) + @($parts)) -join ';';
     [Environment]::SetEnvironmentVariable('Path', $newPath, 'User');
     Write-Output "OK";
   `;
-
   const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', psScript], {
     windowsHide: true,
     encoding: 'utf8'
   });
+  return result.status === 0;
+}
 
-  if (result.status !== 0) {
-    throw new Error(`Failed to update User PATH: ${result.stderr}`);
-  }
+/**
+ * Remove directory from Windows User PATH
+ */
+function removeDirectoryFromUserPath(targetDir) {
+  if (!targetDir) return false;
+  const normalized = path.resolve(targetDir);
+  const psScript = `
+    $target = "${normalized.replace(/\\/g, '\\\\')}";
+    $oldPath = [Environment]::GetEnvironmentVariable('Path', 'User');
+    $parts = $oldPath -split ';' | Where-Object { $_ -ne '' -and $_ -ne $target };
+    $newPath = $parts -join ';';
+    [Environment]::SetEnvironmentVariable('Path', $newPath, 'User');
+    Write-Output "OK";
+  `;
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', psScript], {
+    windowsHide: true,
+    encoding: 'utf8'
+  });
+  return result.status === 0;
+}
 
-  return true;
+/**
+ * Add CURRENT_LINK to Windows User PATH (prepended so it has priority)
+ */
+function addToUserPath() {
+  return addDirectoryToUserPath(CURRENT_LINK);
 }
 
 /**
  * Remove CURRENT_LINK from Windows User PATH
  */
 function removeFromUserPath() {
-  const psScript = `
-    $current = "${CURRENT_LINK}";
-    $oldPath = [Environment]::GetEnvironmentVariable('Path', 'User');
-    $parts = $oldPath -split ';' | Where-Object { $_ -ne '' -and $_ -ne $current };
-    $newPath = $parts -join ';';
-    [Environment]::SetEnvironmentVariable('Path', $newPath, 'User');
-    Write-Output "OK";
-  `;
-
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', psScript], {
-    windowsHide: true,
-    encoding: 'utf8'
-  });
-
-  return result.status === 0;
+  return removeDirectoryFromUserPath(CURRENT_LINK);
 }
 
 module.exports = {
@@ -229,5 +255,8 @@ module.exports = {
   switchVersion,
   checkPathStatus,
   addToUserPath,
-  removeFromUserPath
+  removeFromUserPath,
+  isDirectoryInUserPath,
+  addDirectoryToUserPath,
+  removeDirectoryFromUserPath
 };

@@ -37,6 +37,17 @@
     fullCleanup: (options) => callGo('FullCleanup', options),
     openFolder: (path) => callGo('OpenFolder', path),
 
+    // Composer integration
+    getComposerStatus: () => callGo('GetComposerStatus'),
+    installComposer: () => callGo('InstallComposer'),
+    updateComposer: () => callGo('UpdateComposer'),
+    uninstallComposer: (options) => callGo('UninstallComposer', options),
+    getComposerGlobalPackages: () => callGo('GetComposerGlobalPackages'),
+    installComposerGlobalPackage: (payload) => callGo('InstallComposerGlobalPackage', payload),
+    removeComposerGlobalPackage: (payload) => callGo('RemoveComposerGlobalPackage', payload),
+    updateComposerGlobalPackage: (payload) => callGo('UpdateComposerGlobalPackage', payload),
+    toggleComposerGlobalBinPath: (payload) => callGo('ToggleComposerGlobalBinPath', payload),
+
     onInstallProgress: (callback) => {
       if (window.runtime && window.runtime.EventsOn) {
         return window.runtime.EventsOn('install-progress', callback);
@@ -46,6 +57,18 @@
     onUpdateProgress: (callback) => {
       if (window.runtime && window.runtime.EventsOn) {
         return window.runtime.EventsOn('update-progress', callback);
+      }
+      return () => {};
+    },
+    onComposerProgress: (callback) => {
+      if (window.runtime && window.runtime.EventsOn) {
+        return window.runtime.EventsOn('composer-progress', callback);
+      }
+      return () => {};
+    },
+    onComposerLog: (callback) => {
+      if (window.runtime && window.runtime.EventsOn) {
+        return window.runtime.EventsOn('composer-log', callback);
       }
       return () => {};
     }

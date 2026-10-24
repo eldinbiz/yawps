@@ -40,6 +40,12 @@
           <span>PHP Settings</span>
         </button>
 
+        <button class="nav-item" data-tab="tab-composer">
+          <span class="icon">🎼</span>
+          <span>Composer</span>
+          <span class="badge hidden" id="composer-nav-badge">0</span>
+        </button>
+
         <button class="nav-item" data-tab="tab-env">
           <span class="icon">🌐</span>
           <span>Environment & PATH</span>
@@ -349,7 +355,164 @@
           </div>
         </section>
 
-        <!-- 5. ENVIRONMENT & PATH TAB -->
+        <!-- 5. COMPOSER TAB -->
+        <section id="tab-composer" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>Composer Dependency Manager</h2>
+              <p class="subtitle">Check installation health, manage global PHP packages, and cleanly uninstall.</p>
+            </div>
+            <div class="pane-actions">
+              <button id="btn-composer-refresh" class="btn btn-secondary">🔍 Refresh Status</button>
+              <button id="btn-composer-install" class="btn btn-primary hidden">📥 Install Composer</button>
+              <button id="btn-composer-update" class="btn btn-primary hidden">⚡ Update Composer</button>
+              <button id="btn-composer-uninstall-modal" class="btn btn-danger hidden">🗑️ Remove Composer</button>
+            </div>
+          </div>
+
+          <!-- COMPOSER HEALTH STATUS CARD -->
+          <div class="composer-status-card" id="composer-status-card">
+            <div class="composer-card-header">
+              <div class="composer-logo-wrapper">
+                <span class="composer-logo-icon">🎼</span>
+                <div>
+                  <div class="composer-title-row">
+                    <h3>Composer Installation Status</h3>
+                    <span id="composer-status-badge" class="badge-status checking">Checking...</span>
+                  </div>
+                  <p class="composer-card-sub" id="composer-status-sub">Detecting global Composer binary and runtime environment...</p>
+                </div>
+              </div>
+              <div class="composer-meta-actions">
+                <button id="btn-composer-open-folder" class="btn btn-sm btn-secondary" title="Open Composer Home Folder">📁 Open Home</button>
+              </div>
+            </div>
+
+            <!-- Details Grid -->
+            <div class="composer-grid">
+              <div class="composer-grid-item">
+                <span class="grid-label">Installed Version:</span>
+                <span class="grid-val font-mono" id="comp-val-version">—</span>
+              </div>
+              <div class="composer-grid-item">
+                <span class="grid-label">Official Latest:</span>
+                <span class="grid-val font-mono" id="comp-val-latest">—</span>
+              </div>
+              <div class="composer-grid-item">
+                <span class="grid-label">Active PHP Engine:</span>
+                <span class="grid-val" id="comp-val-php">—</span>
+              </div>
+              <div class="composer-grid-item">
+                <span class="grid-label">Install Type:</span>
+                <span class="grid-val" id="comp-val-type">—</span>
+              </div>
+              <div class="composer-grid-item full-width">
+                <span class="grid-label">Executable Location:</span>
+                <code class="grid-code" id="comp-val-location">—</code>
+              </div>
+              <div class="composer-grid-item full-width">
+                <span class="grid-label">Composer Home Directory:</span>
+                <code class="grid-code" id="comp-val-home">—</code>
+              </div>
+              <div class="composer-grid-item full-width">
+                <div class="path-integration-row">
+                  <div>
+                    <span class="grid-label">Global Bin in PATH (%COMPOSER_HOME%\vendor\bin):</span>
+                    <span id="comp-val-bin-path-badge" class="badge-pill">Checking...</span>
+                  </div>
+                  <button id="btn-toggle-global-bin-path" class="btn btn-xs btn-secondary">⚡ Add to PATH</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- GLOBAL PACKAGES MANAGEMENT -->
+          <div class="composer-packages-section">
+            <div class="section-title-bar">
+              <div class="title-with-count">
+                <h3>Globally Installed PHP Packages</h3>
+                <span class="count-badge" id="composer-packages-count">0</span>
+              </div>
+              <div class="section-actions">
+                <button id="btn-composer-update-all" class="btn btn-secondary btn-sm hidden">🔄 Update All Packages</button>
+              </div>
+            </div>
+
+            <div id="composer-not-installed-alert" class="alert-box alert-box-warning hidden" style="margin-bottom: 20px;">
+              <div class="alert-icon">ℹ️</div>
+              <div class="alert-content">
+                <div class="alert-title">Composer Is Not Installed</div>
+                <div class="alert-desc">Install Composer using the "📥 Install Composer" button above to enable global package installation, updates, and CLI tools.</div>
+              </div>
+            </div>
+
+            <!-- Install Package Form -->
+            <div class="package-install-card" id="package-install-card">
+              <div class="package-install-header">
+                <h4>Require New Global Package</h4>
+                <p>Run <code>composer global require</code> graphically with automatic dependency resolution.</p>
+              </div>
+              <div class="package-install-form">
+                <div class="input-with-icon pkg-name-input">
+                  <span class="input-icon">📦</span>
+                  <input type="text" id="input-pkg-name" placeholder="Package name (e.g. laravel/installer, phpstan/phpstan, pestphp/pest)">
+                </div>
+                <input type="text" id="input-pkg-version" class="pkg-version-input" placeholder="Version (e.g. ^5.0, optional)">
+                <button id="btn-pkg-require" class="btn btn-primary">+ Require Package</button>
+              </div>
+
+              <!-- Recommendation Chips -->
+              <div class="popular-pkgs-chips">
+                <span class="chips-label">Popular CLI Tools:</span>
+                <button class="tool-chip" data-pkg="laravel/installer" title="Laravel CLI installer">laravel/installer</button>
+                <button class="tool-chip" data-pkg="phpstan/phpstan" title="PHP Static Analysis">phpstan/phpstan</button>
+                <button class="tool-chip" data-pkg="pestphp/pest" title="Pest testing framework">pestphp/pest</button>
+                <button class="tool-chip" data-pkg="phpunit/phpunit" title="PHPUnit test runner">phpunit/phpunit</button>
+                <button class="tool-chip" data-pkg="friendsofphp/php-cs-fixer" title="Coding standards fixer">php-cs-fixer</button>
+                <button class="tool-chip" data-pkg="rector/rector" title="Automated code upgrades">rector/rector</button>
+                <button class="tool-chip" data-pkg="psy/psysh" title="Interactive PHP REPL">psy/psysh</button>
+                <button class="tool-chip" data-pkg="deployer/deployer" title="Deployment tool">deployer/deployer</button>
+              </div>
+            </div>
+
+            <!-- Search and Filter Bar -->
+            <div class="packages-toolbar" id="packages-toolbar">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="input-pkg-search" placeholder="Filter installed global packages by name or description...">
+              </div>
+            </div>
+
+            <!-- Packages Cards Grid -->
+            <div id="composer-packages-grid" class="composer-packages-grid">
+              <!-- Dynamically populated -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="composer-packages-empty" class="empty-state hidden">
+              <div class="empty-icon">📦</div>
+              <h3>No Global Packages Installed</h3>
+              <p>You have not installed any global PHP packages yet. Use the form above to require one or pick from popular CLI tools!</p>
+            </div>
+          </div>
+
+          <!-- REAL-TIME COMMAND CONSOLE / LOG DRAWER -->
+          <div id="composer-console-drawer" class="console-drawer hidden">
+            <div class="console-drawer-header">
+              <div class="console-drawer-title">
+                <span class="console-spinner hidden" id="composer-console-spinner">⏳</span>
+                <span id="composer-console-title">Composer Output Console</span>
+              </div>
+              <div class="console-drawer-actions">
+                <button id="btn-console-clear" class="btn-text">Clear Log</button>
+                <button id="btn-console-close" class="btn-text">✕ Close</button>
+              </div>
+            </div>
+            <pre id="composer-console-output" class="console-output"></pre>
+          </div>
+        </section>
+
+        <!-- 6. ENVIRONMENT & PATH TAB -->
         <section id="tab-env" class="tab-pane">
           <div class="pane-header">
             <div>
@@ -484,6 +647,67 @@
       <div class="modal-footer">
         <button id="btn-modal-cancel" class="btn btn-secondary">Cancel</button>
         <button id="btn-modal-confirm-uninstall" class="btn btn-danger">Confirm Uninstall</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPOSER UNINSTALL CONFIRMATION MODAL -->
+  <div id="modal-composer-uninstall" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon">🗑️</div>
+        <h3>Cleanly Remove Composer?</h3>
+      </div>
+      <div class="modal-body">
+        <p>
+          Select which components to remove. YAWPS will cleanly delete binaries and restore system PATH without leaving orphaned configurations.
+        </p>
+
+        <div class="modal-options-list">
+          <label class="modal-checkbox-item">
+            <input type="checkbox" id="chk-composer-rem-bin" checked>
+            <div>
+              <strong>Remove Composer Executables</strong>
+              <span>Deletes <code>composer.phar</code>, <code>composer.bat</code>, and shell wrappers from YAWPS bin.</span>
+            </div>
+          </label>
+
+          <label class="modal-checkbox-item">
+            <input type="checkbox" id="chk-composer-rem-path" checked>
+            <div>
+              <strong>Remove YAWPS Bin from Windows User PATH</strong>
+              <span>Removes Composer directory from your User Environment PATH registry.</span>
+            </div>
+          </label>
+
+          <label class="modal-checkbox-item">
+            <input type="checkbox" id="chk-composer-clean-cache" checked>
+            <div>
+              <strong>Clear Composer Download Cache</strong>
+              <span>Purges cached zip archives from <code>%LOCALAPPDATA%\Composer\cache</code> and home directory.</span>
+            </div>
+          </label>
+
+          <label class="modal-checkbox-item">
+            <input type="checkbox" id="chk-composer-purge-packages">
+            <div>
+              <strong>Purge All Globally Installed Packages</strong>
+              <span>Permanently deletes <code>%COMPOSER_HOME%\vendor</code>, <code>composer.lock</code>, and resets global dependencies.</span>
+            </div>
+          </label>
+
+          <label class="modal-checkbox-item">
+            <input type="checkbox" id="chk-composer-rem-global-bin">
+            <div>
+              <strong>Remove Global Bin from User PATH</strong>
+              <span>Removes <code>%COMPOSER_HOME%\vendor\bin</code> from Windows User PATH.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-composer-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="btn-modal-composer-confirm" class="btn btn-danger">Confirm Clean Removal</button>
       </div>
     </div>
   </div>

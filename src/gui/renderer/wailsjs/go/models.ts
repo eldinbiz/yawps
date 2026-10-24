@@ -16,6 +16,118 @@ export namespace core {
 	        this.junctionRemoved = source["junctionRemoved"];
 	    }
 	}
+	export class ComposerGlobalPackage {
+	    name: string;
+	    version: string;
+	    constraint: string;
+	    description: string;
+	    homepage: string;
+	    license: string[];
+	    binaries: string[];
+	    time: string;
+	    isOutdated: boolean;
+	    latest: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ComposerGlobalPackage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.constraint = source["constraint"];
+	        this.description = source["description"];
+	        this.homepage = source["homepage"];
+	        this.license = source["license"];
+	        this.binaries = source["binaries"];
+	        this.time = source["time"];
+	        this.isOutdated = source["isOutdated"];
+	        this.latest = source["latest"];
+	    }
+	}
+	export class ComposerOperationResult {
+	    success: boolean;
+	    output: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ComposerOperationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.output = source["output"];
+	        this.error = source["error"];
+	    }
+	}
+	export class ComposerStatus {
+	    installed: boolean;
+	    version: string;
+	    releaseDate: string;
+	    location: string;
+	    pharPath: string;
+	    isYawpsManaged: boolean;
+	    latestVersion: string;
+	    isUpToDate: boolean;
+	    activePhp: string;
+	    activePhpPath: string;
+	    composerHome: string;
+	    globalBinDir: string;
+	    isBinInPath: boolean;
+	    isGlobalBinInPath: boolean;
+	    packagesCount: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ComposerStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.installed = source["installed"];
+	        this.version = source["version"];
+	        this.releaseDate = source["releaseDate"];
+	        this.location = source["location"];
+	        this.pharPath = source["pharPath"];
+	        this.isYawpsManaged = source["isYawpsManaged"];
+	        this.latestVersion = source["latestVersion"];
+	        this.isUpToDate = source["isUpToDate"];
+	        this.activePhp = source["activePhp"];
+	        this.activePhpPath = source["activePhpPath"];
+	        this.composerHome = source["composerHome"];
+	        this.globalBinDir = source["globalBinDir"];
+	        this.isBinInPath = source["isBinInPath"];
+	        this.isGlobalBinInPath = source["isGlobalBinInPath"];
+	        this.packagesCount = source["packagesCount"];
+	    }
+	}
+	export class ComposerUninstallResult {
+	    success: boolean;
+	    executablesDeleted: boolean;
+	    pathCleaned: boolean;
+	    cacheDeleted: boolean;
+	    packagesPurged: boolean;
+	    globalBinPathRemoved: boolean;
+	    deletedPaths: string[];
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ComposerUninstallResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.executablesDeleted = source["executablesDeleted"];
+	        this.pathCleaned = source["pathCleaned"];
+	        this.cacheDeleted = source["cacheDeleted"];
+	        this.packagesPurged = source["packagesPurged"];
+	        this.globalBinPathRemoved = source["globalBinPathRemoved"];
+	        this.deletedPaths = source["deletedPaths"];
+	        this.message = source["message"];
+	    }
+	}
 	export class ExtensionInfo {
 	    id: string;
 	    name: string;
