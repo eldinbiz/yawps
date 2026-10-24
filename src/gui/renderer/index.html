@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YAWPS - Yet Another Windows PHP Switcher</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>YAWPS</h1>
+          <span>PHP Switcher</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="tab-installed">
+          <span class="icon">📦</span>
+          <span>Installed Versions</span>
+          <span class="badge" id="installed-count-badge">0</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-download">
+          <span class="icon">📥</span>
+          <span>Download & Install</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-extensions">
+          <span class="icon">🧩</span>
+          <span>Extensions</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-directives">
+          <span class="icon">⚙️</span>
+          <span>PHP Settings</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-env">
+          <span class="icon">🌐</span>
+          <span>Environment & PATH</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="version-label">v0.1 (Windows x64)</div>
+        <button id="btn-open-root-folder" class="btn-text">📁 Open YAWPS Folder</button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- TOP STATUS BAR -->
+      <header class="top-bar">
+        <div class="active-status-card">
+          <div class="status-indicator-dot" id="active-status-dot"></div>
+          <div class="active-status-info">
+            <div class="label">ACTIVE PHP VERSION</div>
+            <div class="value" id="active-version-name">None Selected</div>
+          </div>
+        </div>
+
+        <div class="top-bar-controls">
+          <div class="path-status-pill" id="path-status-pill">
+            <span class="dot"></span>
+            <span id="path-status-text">Checking PATH...</span>
+          </div>
+
+          <div class="quick-switcher">
+            <label for="quick-switch-select">Switch:</label>
+            <select id="quick-switch-select">
+              <option value="">(Select Version)</option>
+            </select>
+          </div>
+
+          <button id="btn-refresh" class="btn-icon" title="Refresh">🔄</button>
+        </div>
+      </header>
+
+      <!-- PROGRESS BANNER -->
+      <div id="progress-banner" class="progress-banner hidden">
+        <div class="progress-header">
+          <span id="progress-stage-text">Downloading PHP...</span>
+          <span id="progress-percent-text">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+        </div>
+        <div id="progress-sub-text" class="progress-sub-text">Starting...</div>
+      </div>
+
+      <!-- TAB CONTENTS -->
+      <div class="content-scroll">
+        <!-- 1. INSTALLED VERSIONS TAB -->
+        <section id="tab-installed" class="tab-pane active">
+          <div class="pane-header">
+            <div>
+              <h2>Installed PHP Versions</h2>
+              <p class="subtitle">Switch versions instantly or manage installed instances.</p>
+            </div>
+            <div class="pane-actions">
+              <button id="btn-check-updates-main" class="btn btn-secondary">🔍 Check for Updates</button>
+              <button id="btn-go-download" class="btn btn-primary">+ Install New Version</button>
+            </div>
+          </div>
+
+          <div id="updates-alert-box" class="alert-box hidden">
+            <div class="alert-icon">⚡</div>
+            <div class="alert-content">
+              <div class="alert-title">Updates Available</div>
+              <div class="alert-desc" id="updates-alert-desc">Newer PHP versions are available for your installed branches.</div>
+            </div>
+          </div>
+
+          <div id="installed-list" class="cards-grid">
+            <!-- Populated dynamically -->
+          </div>
+
+          <div id="installed-empty" class="empty-state hidden">
+            <div class="empty-icon">📂</div>
+            <h3>No PHP Versions Installed</h3>
+            <p>You haven't installed any PHP versions yet. Head over to the Download tab to get started with 1 click!</p>
+            <button class="btn btn-primary" onclick="document.querySelector('[data-tab=\'tab-download\']').click()">Browse Official PHP Releases</button>
+          </div>
+        </section>
+
+        <!-- 2. DOWNLOAD & INSTALL TAB -->
+        <section id="tab-download" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>Download Official PHP Releases</h2>
+              <p class="subtitle">Official Windows precompiled builds directly from windows.php.net.</p>
+            </div>
+            <div class="pane-filters">
+              <div class="flavor-toggle">
+                <span class="label">Flavor:</span>
+                <button class="toggle-btn active" id="btn-flavor-nts">NTS (Recommended)</button>
+                <button class="toggle-btn" id="btn-flavor-ts">TS (Thread-Safe)</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="filter-chips" id="branch-chips">
+            <button class="chip active" data-branch="all">All</button>
+            <button class="chip" data-branch="8.5">8.5</button>
+            <button class="chip" data-branch="8.4">8.4</button>
+            <button class="chip" data-branch="8.3">8.3</button>
+            <button class="chip" data-branch="8.2">8.2</button>
+            <button class="chip" data-branch="8.1">8.1</button>
+            <button class="chip" data-branch="8.0">8.0</button>
+            <button class="chip" data-branch="7.4">7.4</button>
+          </div>
+
+          <div id="remote-list" class="cards-grid">
+            <div class="loading-state">Loading official releases from windows.php.net...</div>
+          </div>
+        </section>
+
+        <!-- 3. EXTENSIONS TAB -->
+        <section id="tab-extensions" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>PHP Extensions Manager</h2>
+              <p class="subtitle">Enable or disable extensions visually. Changes apply immediately to <code>php.ini</code>.</p>
+            </div>
+            <div class="pane-actions">
+              <div class="version-select-group">
+                <label for="ext-version-select">Target Version:</label>
+                <select id="ext-version-select"></select>
+              </div>
+              <button id="btn-enable-common-exts" class="btn btn-secondary">⚡ Enable Standard Web Stack</button>
+            </div>
+          </div>
+
+          <div class="search-and-filter">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="ext-search-input" placeholder="Search extension (e.g. curl, mbstring, pdo_mysql, gd)...">
+            </div>
+
+            <div class="category-chips" id="ext-category-chips">
+              <button class="chip active" data-cat="all">All</button>
+              <button class="chip" data-cat="Database">Database</button>
+              <button class="chip" data-cat="Network">Network</button>
+              <button class="chip" data-cat="Security">Security</button>
+              <button class="chip" data-cat="Media">Media</button>
+              <button class="chip" data-cat="Compression">Compression</button>
+              <button class="chip" data-cat="String">String</button>
+              <button class="chip" data-cat="Performance">Performance</button>
+            </div>
+          </div>
+
+          <div id="extensions-list" class="extensions-table-container">
+            <!-- Populated dynamically with visual switches -->
+          </div>
+        </section>
+
+        <!-- 4. PHP DIRECTIVES / SETTINGS TAB -->
+        <section id="tab-directives" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>PHP Directives & Configuration</h2>
+              <p class="subtitle">Graphically tune memory limits, upload caps, execution limits, and error reporting.</p>
+            </div>
+            <div class="pane-actions">
+              <div class="version-select-group">
+                <label for="directives-version-select">Target Version:</label>
+                <select id="directives-version-select"></select>
+              </div>
+              <button id="btn-save-directives" class="btn btn-primary">💾 Save Settings</button>
+            </div>
+          </div>
+
+          <div class="directives-form-grid">
+            <!-- MEMORY LIMIT -->
+            <div class="form-card">
+              <div class="card-header">
+                <h3>Memory Limit</h3>
+                <span class="directive-code">memory_limit</span>
+              </div>
+              <p class="card-desc">Maximum amount of memory a script may consume.</p>
+              <div class="input-with-presets">
+                <input type="text" id="input-memory-limit" placeholder="e.g. 512M">
+                <div class="preset-buttons" data-target="input-memory-limit">
+                  <button type="button" data-val="128M">128M</button>
+                  <button type="button" data-val="256M">256M</button>
+                  <button type="button" data-val="512M">512M</button>
+                  <button type="button" data-val="1G">1G</button>
+                  <button type="button" data-val="-1">Unlimited (-1)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- UPLOAD MAX FILESIZE -->
+            <div class="form-card">
+              <div class="card-header">
+                <h3>Upload Max Filesize</h3>
+                <span class="directive-code">upload_max_filesize</span>
+              </div>
+              <p class="card-desc">Maximum allowed size for uploaded files.</p>
+              <div class="input-with-presets">
+                <input type="text" id="input-upload-max-filesize" placeholder="e.g. 64M">
+                <div class="preset-buttons" data-target="input-upload-max-filesize">
+                  <button type="button" data-val="8M">8M</button>
+                  <button type="button" data-val="32M">32M</button>
+                  <button type="button" data-val="64M">64M</button>
+                  <button type="button" data-val="128M">128M</button>
+                  <button type="button" data-val="512M">512M</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- POST MAX SIZE -->
+            <div class="form-card">
+              <div class="card-header">
+                <h3>Post Max Size</h3>
+                <span class="directive-code">post_max_size</span>
+              </div>
+              <p class="card-desc">Max size of POST data accepted (should be &ge; upload_max_filesize).</p>
+              <div class="input-with-presets">
+                <input type="text" id="input-post-max-size" placeholder="e.g. 64M">
+                <div class="preset-buttons" data-target="input-post-max-size">
+                  <button type="button" data-val="8M">8M</button>
+                  <button type="button" data-val="32M">32M</button>
+                  <button type="button" data-val="64M">64M</button>
+                  <button type="button" data-val="128M">128M</button>
+                  <button type="button" data-val="512M">512M</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- MAX EXECUTION TIME -->
+            <div class="form-card">
+              <div class="card-header">
+                <h3>Max Execution Time</h3>
+                <span class="directive-code">max_execution_time</span>
+              </div>
+              <p class="card-desc">Maximum execution time of each script, in seconds.</p>
+              <div class="input-with-presets">
+                <input type="text" id="input-max-execution-time" placeholder="e.g. 120">
+                <div class="preset-buttons" data-target="input-max-execution-time">
+                  <button type="button" data-val="30">30s</button>
+                  <button type="button" data-val="60">60s</button>
+                  <button type="button" data-val="120">120s</button>
+                  <button type="button" data-val="300">300s</button>
+                  <button type="button" data-val="0">Unlimited (0)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- DISPLAY ERRORS (SWITCH) -->
+            <div class="form-card">
+              <div class="card-header">
+                <h3>Display Errors</h3>
+                <span class="directive-code">display_errors</span>
+              </div>
+              <p class="card-desc">Show errors on screen during script execution (helpful for local debugging).</p>
+              <div class="switch-row">
+                <label class="switch">
+                  <input type="checkbox" id="switch-display-errors">
+                  <span class="slider"></span>
+                </label>
+                <span class="switch-label" id="display-errors-label">Off</span>
+              </div>
+            </div>
+
+            <!-- OPCACHE ENABLE (SWITCH) -->
+            <div class="form-card">
+              <div class="card-header">
+                <h3>Zend OPcache</h3>
+                <span class="directive-code">opcache.enable</span>
+              </div>
+              <p class="card-desc">Enables the opcode cache in shared memory for lightning-fast execution.</p>
+              <div class="switch-row">
+                <label class="switch">
+                  <input type="checkbox" id="switch-opcache-enable">
+                  <span class="slider"></span>
+                </label>
+                <span class="switch-label" id="opcache-enable-label">Off</span>
+              </div>
+            </div>
+
+            <!-- TIMEZONE -->
+            <div class="form-card full-width">
+              <div class="card-header">
+                <h3>Default Timezone</h3>
+                <span class="directive-code">date.timezone</span>
+              </div>
+              <p class="card-desc">The default timezone used by all date/time functions.</p>
+              <select id="select-timezone">
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">America/New_York (EST/EDT)</option>
+                <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+                <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+                <option value="Europe/London">Europe/London (GMT/BST)</option>
+                <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                <option value="Europe/Berlin">Europe/Berlin (CET/CEST)</option>
+                <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
+                <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                <option value="Australia/Sydney">Australia/Sydney (AEST/AEDT)</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. ENVIRONMENT & PATH TAB -->
+        <section id="tab-env" class="tab-pane">
+          <div class="pane-header">
+            <div>
+              <h2>Windows Environment & PATH</h2>
+              <p class="subtitle">Automatic Windows PATH linking and junction management.</p>
+            </div>
+            <div class="pane-actions">
+              <button id="btn-fix-path" class="btn btn-primary">⚡ Configure User PATH</button>
+              <button id="btn-remove-path" class="btn btn-secondary">❌ Remove from User PATH</button>
+            </div>
+          </div>
+
+          <div class="env-cards-stack">
+            <!-- SYSTEM COMPATIBILITY CARD -->
+            <div class="info-card">
+              <h3>🪟 Windows System & Platform Status</h3>
+              <div class="junction-status-row">
+                <div class="junction-item">
+                  <span class="junction-label">Operating System:</span>
+                  <code id="env-os-name">Detecting...</code>
+                </div>
+                <div class="junction-item">
+                  <span class="junction-label">Platform Compatibility:</span>
+                  <span id="env-os-badge" class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 13px;">✔ Windows 10+ Compatible</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- HOW IT WORKS CARD -->
+            <div class="info-card">
+              <h3>⚡ How Environment Switching Works Seamlessly</h3>
+              <p>
+                YAWPS uses an NTFS Directory Junction at <code>%USERPROFILE%\.yawps\current</code>.
+                When this directory is added to your User PATH, you can switch PHP versions instantaneously without restarting your IDEs or terminals!
+              </p>
+              <div class="junction-status-row">
+                <div class="junction-item">
+                  <span class="junction-label">Junction Point:</span>
+                  <code id="env-junction-path">C:\Users\username\.yawps\current</code>
+                </div>
+                <div class="junction-arrow">➜</div>
+                <div class="junction-item">
+                  <span class="junction-label">Points to Target:</span>
+                  <code id="env-target-path">None</code>
+                </div>
+              </div>
+            </div>
+
+            <!-- DETECTED PHP PATHS -->
+            <div class="info-card">
+              <h3>🔍 Detected PHP Executables in System</h3>
+              <p>The order below represents which <code>php.exe</code> Windows executes first when you run <code>php</code> in PowerShell/CMD:</p>
+              <div id="detected-paths-list" class="paths-list">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- QUICK CLI USAGE GUIDE -->
+            <div class="info-card">
+              <h3>💻 CLI Commands Cheat Sheet</h3>
+              <div class="cli-cheat-sheet">
+                <div class="cli-row">
+                  <code>yawps list</code>
+                  <span>List installed versions and active version</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps install 8.3</code>
+                  <span>Download and install PHP 8.3 (NTS x64)</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps use 8.3</code>
+                  <span>Switch active version to PHP 8.3</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps update</code>
+                  <span>Check and install latest patch updates</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps ext list</code>
+                  <span>List extensions and active status</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps ext enable curl</code>
+                  <span>Enable extension in active php.ini</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps uninstall 8.3</code>
+                  <span>Uninstall PHP version and unlink junction</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps env remove</code>
+                  <span>Remove YAWPS from Windows User PATH</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps cleanup</code>
+                  <span>Full cleanup: unlink PATH and wipe data</span>
+                </div>
+                <div class="cli-row">
+                  <code>yawps gui</code>
+                  <span>Launch this Desktop Window</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- UNINSTALL CONFIRMATION MODAL -->
+  <div id="modal-uninstall" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon">🗑️</div>
+        <h3 id="modal-uninstall-title">Uninstall PHP Version?</h3>
+      </div>
+      <div class="modal-body">
+        <p id="modal-uninstall-desc">
+          Are you sure you want to uninstall this PHP version? All custom configurations in its directory will be permanently removed.
+        </p>
+        <div id="modal-uninstall-active-warning" class="alert-box alert-box-warning hidden" style="margin-top: 12px; padding: 10px 14px;">
+          <div class="alert-icon">⚠️</div>
+          <div style="font-size: 13px;">This is your <strong>currently active</strong> PHP version. YAWPS will automatically switch to another installed version or unlink the active junction.</div>
+        </div>
+        <div class="modal-checkbox-row">
+          <label>
+            <input type="checkbox" id="modal-uninstall-clean-cache">
+            <span>Also delete downloaded installer archive (.zip) from cache</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-cancel" class="btn btn-secondary">Cancel</button>
+        <button id="btn-modal-confirm-uninstall" class="btn btn-danger">Confirm Uninstall</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="bridge.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

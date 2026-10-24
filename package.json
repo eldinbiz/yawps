@@ -1,0 +1,67 @@
+{
+  "name": "yawps",
+  "version": "0.1.0",
+  "description": "YAWPS - Yet Another Windows PHP Switcher",
+  "main": "src/gui/main.js",
+  "bin": {
+    "yawps": "./bin/yawps.js",
+    "win-php": "./bin/yawps.js"
+  },
+  "scripts": {
+    "start": "electron src/gui/main.js",
+    "gui": "electron src/gui/main.js",
+    "cli": "node bin/yawps.js",
+    "build:wails": "powershell -NoProfile -Command \"$env:Path = 'C:\\Program Files\\Go\\bin;C:\\Users\\eldin\\go\\bin;' + $env:Path; wails build; if (Test-Path build\\bin\\yawps.exe) { New-Item -ItemType Directory -Force -Path dist | Out-Null; Copy-Item build\\bin\\yawps.exe dist\\yawps.exe -Force }\"",
+    "build:wails:upx": "powershell -NoProfile -Command \"$env:Path = 'C:\\Program Files\\Go\\bin;C:\\Users\\eldin\\go\\bin;' + $env:Path; wails build -upx; if (Test-Path build\\bin\\yawps.exe) { New-Item -ItemType Directory -Force -Path dist | Out-Null; Copy-Item build\\bin\\yawps.exe dist\\yawps.exe -Force }\"",
+    "dist:wails": "powershell -NoProfile -Command \"$env:Path = 'C:\\Program Files\\Go\\bin;C:\\Users\\eldin\\go\\bin;' + $env:Path; wails build -upx; if (Test-Path build\\bin\\yawps.exe) { New-Item -ItemType Directory -Force -Path dist | Out-Null; Copy-Item build\\bin\\yawps.exe dist\\yawps.exe -Force }\"",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win portable",
+    "dist:nsis": "electron-builder --win nsis"
+  },
+  "keywords": [
+    "php",
+    "windows",
+    "switcher",
+    "manager",
+    "downloader",
+    "installer",
+    "version-manager",
+    "yawps"
+  ],
+  "author": "",
+  "license": "MIT",
+  "build": {
+    "appId": "com.yawps.switcher",
+    "productName": "YAWPS",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "files": [
+      "src/**/*",
+      "bin/**/*",
+      "package.json"
+    ],
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1"
+  }
+}

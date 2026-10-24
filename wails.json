@@ -1,0 +1,12 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "yawps",
+  "outputfilename": "yawps",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dir": "src/gui/renderer",
+  "author": {
+    "name": "YAWPS"
+  }
+}
