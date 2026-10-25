@@ -84,6 +84,8 @@ function setupNavigation() {
         loadExtensions();
       } else if (targetTabId === 'tab-directives') {
         loadDirectives();
+      } else if (targetTabId === 'tab-composer') {
+        loadComposerTab();
       } else if (targetTabId === 'tab-env') {
         renderEnvironmentTab();
       }
@@ -274,6 +276,190 @@ function setupEventListeners() {
       }
     });
   }
+
+  // ==========================================
+  // COMPOSER MODULE EVENT LISTENERS
+  // ==========================================
+  const btnCompRefresh = document.getElementById('btn-composer-refresh');
+  if (btnCompRefresh) {
+    btnCompRefresh.addEventListener('click', async () => {
+      await loadComposerTab(true);
+      showToast('Refreshed Composer status');
+    });
+  }
+
+  const btnCompInstall = document.getElementById('btn-composer-install');
+  if (btnCompInstall) {
+    btnCompInstall.addEventListener('click', async () => {
+      try {
+        showToast('Downloading and installing official Composer...');
+        const res = await window.api.installComposer();
+        if (res && res.success) {
+          showToast('✔ Composer installed successfully!');
+          await loadComposerTab(true);
+        } else {
+          showToast(`Installation error: ${res ? res.error : 'Unknown'}`, true);
+        }
+      } catch (err) {
+        showToast(`Error installing Composer: ${err.message}`, true);
+      }
+    });
+  }
+
+  const btnCompUpdate = document.getElementById('btn-composer-update');
+  if (btnCompUpdate) {
+    btnCompUpdate.addEventListener('click', async () => {
+      try {
+        showToast('Updating Composer...');
+        const res = await window.api.updateComposer();
+        if (res && res.success) {
+          showToast('✔ Composer updated successfully!');
+          await loadComposerTab(true);
+        } else {
+          showToast(`Update error: ${res ? res.error : 'Unknown'}`, true);
+        }
+      } catch (err) {
+        showToast(`Error updating Composer: ${err.message}`, true);
+      }
+    });
+  }
+
+  const modalComposerUninstall = document.getElementById('modal-composer-uninstall');
+  const btnModalComposerCancel = document.getElementById('btn-modal-composer-cancel');
+  const btnModalComposerConfirm = document.getElementById('btn-modal-composer-confirm');
+  const btnComposerUninstallModal = document.getElementById('btn-composer-uninstall-modal');
+
+  if (btnComposerUninstallModal && modalComposerUninstall) {
+    btnComposerUninstallModal.addEventListener('click', () => {
+      modalComposerUninstall.classList.remove('hidden');
+    });
+  }
+
+  if (btnModalComposerCancel && modalComposerUninstall) {
+    btnModalComposerCancel.addEventListener('click', () => {
+      modalComposerUninstall.classList.add('hidden');
+    });
+  }
+
+  if (modalComposerUninstall) {
+    modalComposerUninstall.addEventListener('click', (e) => {
+      if (e.target === modalComposerUninstall) {
+        modalComposerUninstall.classList.add('hidden');
+      }
+    });
+  }
+
+  if (btnModalComposerConfirm && modalComposerUninstall) {
+    btnModalComposerConfirm.addEventListener('click', async () => {
+      const removeBin = document.getElementById('chk-composer-rem-bin').checked;
+      const removeFromPath = document.getElementById('chk-composer-rem-path').checked;
+      const cleanCache = document.getElementById('chk-composer-clean-cache').checked;
+      const purgePackages = document.getElementById('chk-composer-purge-packages').checked;
+      const removeGlobalBinFromPath = document.getElementById('chk-composer-rem-global-bin').checked;
+
+      modalComposerUninstall.classList.add('hidden');
+
+      try {
+        showToast('Removing Composer cleanly...');
+        const res = await window.api.uninstallComposer({
+          removeBin,
+          removeFromPath,
+          cleanCache,
+          purgePackages,
+          removeGlobalBinFromPath
+        });
+        showToast(res && res.message ? res.message : '✔ Composer removed cleanly!');
+        await loadComposerTab(true);
+      } catch (err) {
+        showToast(`Uninstall failed: ${err.message}`, true);
+      }
+    });
+  }
+
+  const btnComposerOpenFolder = document.getElementById('btn-composer-open-folder');
+  if (btnComposerOpenFolder) {
+    btnComposerOpenFolder.addEventListener('click', () => {
+      if (appState.composer && appState.composer.status && appState.composer.status.composerHome) {
+        window.api.openFolder(appState.composer.status.composerHome);
+      } else {
+        window.api.openFolder();
+      }
+    });
+  }
+
+  const btnToggleGlobalBin = document.getElementById('btn-toggle-global-bin-path');
+  if (btnToggleGlobalBin) {
+    btnToggleGlobalBin.addEventListener('click', async () => {
+      try {
+        const isCurrentlyIn = appState.composer && appState.composer.status && appState.composer.status.isGlobalBinInPath;
+        await window.api.toggleComposerGlobalBinPath({ enable: !isCurrentlyIn });
+        showToast(!isCurrentlyIn ? '✔ Added Composer Global Bin to User PATH!' : '✔ Removed Global Bin from User PATH');
+        await loadComposerTab(true);
+      } catch (err) {
+        showToast(`Error: ${err.message}`, true);
+      }
+    });
+  }
+
+  const btnPkgRequire = document.getElementById('btn-pkg-require');
+  if (btnPkgRequire) {
+    btnPkgRequire.addEventListener('click', async () => {
+      const pkgName = document.getElementById('input-pkg-name').value;
+      const pkgVersion = document.getElementById('input-pkg-version').value;
+      await handleInstallComposerPackage(pkgName, pkgVersion);
+    });
+  }
+
+  const inputPkgName = document.getElementById('input-pkg-name');
+  if (inputPkgName) {
+    inputPkgName.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') {
+        const pkgName = document.getElementById('input-pkg-name').value;
+        const pkgVersion = document.getElementById('input-pkg-version').value;
+        await handleInstallComposerPackage(pkgName, pkgVersion);
+      }
+    });
+  }
+
+  document.querySelectorAll('.tool-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const pkg = chip.dataset.pkg;
+      const input = document.getElementById('input-pkg-name');
+      if (input) {
+        input.value = pkg;
+        document.getElementById('input-pkg-version').value = '';
+        input.focus();
+      }
+    });
+  });
+
+  const inputPkgSearch = document.getElementById('input-pkg-search');
+  if (inputPkgSearch) {
+    inputPkgSearch.addEventListener('input', (e) => {
+      renderComposerPackages(e.target.value);
+    });
+  }
+
+  const btnUpdateAll = document.getElementById('btn-composer-update-all');
+  if (btnUpdateAll) {
+    btnUpdateAll.addEventListener('click', async () => {
+      await handleUpdateComposerPackage('');
+    });
+  }
+
+  const btnConsoleClear = document.getElementById('btn-console-clear');
+  if (btnConsoleClear) {
+    btnConsoleClear.addEventListener('click', () => {
+      clearConsoleLog();
+    });
+  }
+
+  const btnConsoleClose = document.getElementById('btn-console-close');
+  if (btnConsoleClose) {
+    btnConsoleClose.addEventListener('click', () => {
+      closeConsoleDrawer();
+    });
+  }
 }
 
 // SETUP PROGRESS LISTENERS
@@ -285,6 +471,20 @@ function setupProgressListeners() {
   window.api.onUpdateProgress((p) => {
     showProgress(p);
   });
+
+  if (window.api.onComposerProgress) {
+    window.api.onComposerProgress((p) => {
+      showProgress(p);
+    });
+  }
+
+  if (window.api.onComposerLog) {
+    window.api.onComposerLog((data) => {
+      if (data && data.text) {
+        appendConsoleLog(data.text);
+      }
+    });
+  }
 }
 
 function showProgress(p) {
@@ -859,4 +1059,376 @@ function renderEnvironmentTab() {
     `;
     detectedListEl.appendChild(row);
   });
+}
+
+// ==========================================
+// COMPOSER MODULE IMPLEMENTATION
+// ==========================================
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function loadComposerTab(force = false) {
+  const statusBadgeEl = document.getElementById('composer-status-badge');
+  const statusSubEl = document.getElementById('composer-status-sub');
+  const btnInstall = document.getElementById('btn-composer-install');
+  const btnUpdate = document.getElementById('btn-composer-update');
+  const btnUninstallModal = document.getElementById('btn-composer-uninstall-modal');
+
+  if (statusBadgeEl) {
+    statusBadgeEl.className = 'badge-status checking';
+    statusBadgeEl.textContent = 'Checking...';
+  }
+
+  try {
+    const [status, packages] = await Promise.all([
+      window.api.getComposerStatus(),
+      window.api.getComposerGlobalPackages()
+    ]);
+
+    appState.composer = {
+      status,
+      packages: packages || []
+    };
+
+    const notInstalledAlert = document.getElementById('composer-not-installed-alert');
+    const pkgInstallCard = document.getElementById('package-install-card');
+    const pkgToolbar = document.getElementById('packages-toolbar');
+    const btnUpdateAll = document.getElementById('btn-composer-update-all');
+
+    if (statusBadgeEl && statusSubEl) {
+      if (status.installed) {
+        if (status.isUpToDate) {
+          statusBadgeEl.className = 'badge-status installed';
+          statusBadgeEl.textContent = `✔ Installed (v${status.version})`;
+          statusSubEl.textContent = `Composer v${status.version} is installed and up to date with official stable release.`;
+          if (btnUpdate) btnUpdate.classList.add('hidden');
+        } else if (status.latestVersion) {
+          statusBadgeEl.className = 'badge-status update-available';
+          statusBadgeEl.textContent = `▲ Update Available (v${status.latestVersion})`;
+          statusSubEl.textContent = `Composer v${status.version} is installed. Newer release v${status.latestVersion} is available!`;
+          if (btnUpdate) {
+            btnUpdate.classList.remove('hidden');
+            btnUpdate.textContent = `⚡ Update to v${status.latestVersion}`;
+          }
+        } else {
+          statusBadgeEl.className = 'badge-status installed';
+          statusBadgeEl.textContent = `✔ Installed (v${status.version})`;
+          statusSubEl.textContent = `Composer v${status.version} is installed.`;
+          if (btnUpdate) btnUpdate.classList.add('hidden');
+        }
+
+        if (btnInstall) btnInstall.classList.add('hidden');
+        if (btnUninstallModal) btnUninstallModal.classList.remove('hidden');
+        if (notInstalledAlert) notInstalledAlert.classList.add('hidden');
+        if (pkgInstallCard) pkgInstallCard.classList.remove('hidden');
+        if (pkgToolbar) pkgToolbar.classList.remove('hidden');
+        if (btnUpdateAll) btnUpdateAll.classList.remove('hidden');
+      } else {
+        statusBadgeEl.className = 'badge-status not-installed';
+        statusBadgeEl.textContent = '❌ Not Installed';
+        statusSubEl.textContent = status.latestVersion
+          ? `Composer is not installed on this system. Click the "Install Composer" button above to download and set up official Composer v${status.latestVersion}.`
+          : 'Composer is not installed on this system.';
+        if (btnInstall) btnInstall.classList.remove('hidden');
+        if (btnUpdate) btnUpdate.classList.add('hidden');
+        if (btnUninstallModal) btnUninstallModal.classList.add('hidden');
+        if (notInstalledAlert) notInstalledAlert.classList.remove('hidden');
+        if (pkgInstallCard) pkgInstallCard.classList.add('hidden');
+        if (pkgToolbar) pkgToolbar.classList.add('hidden');
+        if (btnUpdateAll) btnUpdateAll.classList.add('hidden');
+      }
+    }
+
+    // Grid details
+    const elVersion = document.getElementById('comp-val-version');
+    if (elVersion) elVersion.textContent = status.version ? `v${status.version} (${status.releaseDate || 'official'})` : 'Not installed';
+
+    const elLatest = document.getElementById('comp-val-latest');
+    if (elLatest) elLatest.textContent = status.latestVersion ? `v${status.latestVersion} (stable)` : 'Checking...';
+
+    const elPhp = document.getElementById('comp-val-php');
+    if (elPhp) elPhp.textContent = status.activePhp || 'None (Select a PHP version)';
+
+    const elType = document.getElementById('comp-val-type');
+    if (elType) elType.textContent = status.installed ? (status.isYawpsManaged ? '⚡ YAWPS Native Integration' : '🌐 System / External Binary') : 'Not Installed';
+
+    const elLoc = document.getElementById('comp-val-location');
+    if (elLoc) elLoc.textContent = status.installed ? (status.location || status.pharPath || 'Detected on PATH') : 'None';
+
+    const elHome = document.getElementById('comp-val-home');
+    if (elHome) elHome.textContent = status.composerHome || 'None';
+
+    // Global Bin in PATH
+    const binBadge = document.getElementById('comp-val-bin-path-badge');
+    const btnToggleBin = document.getElementById('btn-toggle-global-bin-path');
+    if (binBadge && btnToggleBin) {
+      if (!status.installed) {
+        binBadge.className = 'badge-pill';
+        binBadge.textContent = 'Composer not installed';
+        btnToggleBin.disabled = true;
+        btnToggleBin.classList.add('hidden');
+      } else if (status.isGlobalBinInPath) {
+        binBadge.className = 'badge-pill success';
+        binBadge.textContent = '✔ Added to User PATH';
+        btnToggleBin.textContent = 'Remove from PATH';
+        btnToggleBin.className = 'btn btn-xs btn-secondary';
+        btnToggleBin.disabled = false;
+        btnToggleBin.classList.remove('hidden');
+      } else {
+        binBadge.className = 'badge-pill warning';
+        binBadge.textContent = '⚠️ Not in User PATH';
+        btnToggleBin.textContent = '⚡ Add to PATH';
+        btnToggleBin.className = 'btn btn-xs btn-primary';
+        btnToggleBin.disabled = false;
+        btnToggleBin.classList.remove('hidden');
+      }
+    }
+
+    // Package count badge
+    const pkgCount = status.installed ? appState.composer.packages.length : 0;
+    const pkgCountEl = document.getElementById('composer-packages-count');
+    if (pkgCountEl) pkgCountEl.textContent = pkgCount;
+
+    const navBadge = document.getElementById('composer-nav-badge');
+    if (navBadge) {
+      navBadge.textContent = pkgCount;
+      navBadge.classList.toggle('hidden', pkgCount === 0);
+    }
+
+    // Render packages
+    renderComposerPackages();
+
+  } catch (err) {
+    if (statusBadgeEl) {
+      statusBadgeEl.className = 'badge-status not-installed';
+      statusBadgeEl.textContent = 'Error';
+    }
+    if (statusSubEl) {
+      statusSubEl.textContent = `Failed to query Composer status: ${err.message}`;
+    }
+    showToast(`Composer error: ${err.message}`, true);
+  }
+}
+
+function renderComposerPackages(filter = '') {
+  const gridEl = document.getElementById('composer-packages-grid');
+  const emptyEl = document.getElementById('composer-packages-empty');
+  if (!gridEl) return;
+
+  gridEl.innerHTML = '';
+
+  if (appState.composer && appState.composer.status && !appState.composer.status.installed) {
+    if (emptyEl) emptyEl.classList.add('hidden');
+    return;
+  }
+
+  const packages = (appState.composer && appState.composer.packages) ? appState.composer.packages : [];
+  const normalizedFilter = filter.toLowerCase().trim();
+
+  const filtered = packages.filter(p => {
+    if (!normalizedFilter) return true;
+    return (p.name || '').toLowerCase().includes(normalizedFilter) ||
+           (p.description || '').toLowerCase().includes(normalizedFilter);
+  });
+
+  if (filtered.length === 0) {
+    if (emptyEl) {
+      emptyEl.classList.remove('hidden');
+      if (normalizedFilter) {
+        emptyEl.querySelector('h3').textContent = 'No Matching Packages';
+        emptyEl.querySelector('p').textContent = `No global packages matched "${filter}".`;
+      } else {
+        emptyEl.querySelector('h3').textContent = 'No Global Packages Installed';
+        emptyEl.querySelector('p').textContent = 'You haven\'t installed any global PHP packages yet. Use the form above to require one!';
+      }
+    }
+    return;
+  }
+
+  if (emptyEl) emptyEl.classList.add('hidden');
+
+  filtered.forEach(pkg => {
+    const card = document.createElement('div');
+    card.className = 'composer-pkg-card';
+
+    const binTagsHtml = (pkg.binaries && pkg.binaries.length > 0)
+      ? `<span class="pkg-bin-tag" title="CLI command available in terminal">⚡ ${escapeHtml(pkg.binaries.join(', '))}</span>`
+      : '';
+
+    const licenseHtml = (pkg.license && pkg.license.length > 0)
+      ? `<span class="pkg-license-tag">${escapeHtml(pkg.license.join(', '))}</span>`
+      : '';
+
+    const constraintHtml = pkg.constraint
+      ? `<span class="pkg-constraint-badge" title="Required Constraint">${escapeHtml(pkg.constraint)}</span>`
+      : '';
+
+    card.innerHTML = `
+      <div>
+        <div class="pkg-header">
+          <div class="pkg-title">${escapeHtml(pkg.name)}</div>
+          <div class="pkg-badges">
+            <span class="pkg-ver-badge">${escapeHtml(pkg.version)}</span>
+            ${constraintHtml}
+          </div>
+        </div>
+        <div class="pkg-desc">${escapeHtml(pkg.description || 'No description provided.')}</div>
+        <div class="pkg-meta-row">
+          ${binTagsHtml}
+          ${licenseHtml}
+        </div>
+      </div>
+      <div class="pkg-actions">
+        <button class="btn btn-xs btn-secondary btn-pkg-packagist">🌐 Packagist</button>
+        <button class="btn btn-xs btn-secondary btn-pkg-update">🔄 Update</button>
+        <button class="btn btn-xs btn-danger btn-pkg-remove">🗑️ Remove</button>
+      </div>
+    `;
+
+    card.querySelector('.btn-pkg-packagist').addEventListener('click', () => {
+      const url = `https://packagist.org/packages/${encodeURIComponent(pkg.name)}`;
+      window.open(url, '_blank');
+    });
+
+    card.querySelector('.btn-pkg-update').addEventListener('click', async () => {
+      await handleUpdateComposerPackage(pkg.name);
+    });
+
+    card.querySelector('.btn-pkg-remove').addEventListener('click', async () => {
+      await handleRemoveComposerPackage(pkg.name);
+    });
+
+    gridEl.appendChild(card);
+  });
+}
+
+function openConsoleDrawer(title = 'Composer Command') {
+  const drawer = document.getElementById('composer-console-drawer');
+  if (!drawer) return;
+  document.getElementById('composer-console-title').textContent = title;
+  const spinner = document.getElementById('composer-console-spinner');
+  if (spinner) spinner.classList.remove('hidden');
+  drawer.classList.remove('hidden');
+}
+
+function closeConsoleDrawer() {
+  const drawer = document.getElementById('composer-console-drawer');
+  if (drawer) drawer.classList.add('hidden');
+}
+
+function appendConsoleLog(line) {
+  const output = document.getElementById('composer-console-output');
+  if (output) {
+    output.textContent += line + '\n';
+    output.scrollTop = output.scrollHeight;
+  }
+}
+
+function clearConsoleLog() {
+  const output = document.getElementById('composer-console-output');
+  if (output) output.textContent = '';
+}
+
+async function handleInstallComposerPackage(name, version = '') {
+  if (!name || !name.trim()) {
+    showToast('Please enter a package name (e.g. laravel/installer)', true);
+    return;
+  }
+
+  clearConsoleLog();
+  openConsoleDrawer(`Installing global package: ${name}`);
+  appendConsoleLog(`> composer global require ${name}${version ? ':' + version : ''} --no-interaction\n`);
+
+  try {
+    const res = await window.api.installComposerGlobalPackage({
+      packageName: name.trim(),
+      version: version.trim()
+    });
+
+    const spinner = document.getElementById('composer-console-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
+    if (res && res.success) {
+      appendConsoleLog('\n✔ Package installed successfully!');
+      showToast(`✔ Successfully installed ${name}!`);
+      const inputName = document.getElementById('input-pkg-name');
+      const inputVer = document.getElementById('input-pkg-version');
+      if (inputName) inputName.value = '';
+      if (inputVer) inputVer.value = '';
+      await loadComposerTab(true);
+    } else {
+      appendConsoleLog(`\n❌ Installation failed: ${res ? res.error : 'Unknown error'}`);
+      showToast(`Failed to install ${name}`, true);
+    }
+  } catch (err) {
+    const spinner = document.getElementById('composer-console-spinner');
+    if (spinner) spinner.classList.add('hidden');
+    appendConsoleLog(`\n❌ Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, true);
+  }
+}
+
+async function handleRemoveComposerPackage(name) {
+  if (!confirm(`Are you sure you want to remove global package "${name}"?`)) {
+    return;
+  }
+
+  clearConsoleLog();
+  openConsoleDrawer(`Removing global package: ${name}`);
+  appendConsoleLog(`> composer global remove ${name} --no-interaction\n`);
+
+  try {
+    const res = await window.api.removeComposerGlobalPackage({ packageName: name });
+    const spinner = document.getElementById('composer-console-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
+    if (res && res.success) {
+      appendConsoleLog('\n✔ Package removed successfully!');
+      showToast(`✔ Successfully removed ${name}!`);
+      await loadComposerTab(true);
+    } else {
+      appendConsoleLog(`\n❌ Removal failed: ${res ? res.error : 'Unknown error'}`);
+      showToast(`Failed to remove ${name}`, true);
+    }
+  } catch (err) {
+    const spinner = document.getElementById('composer-console-spinner');
+    if (spinner) spinner.classList.add('hidden');
+    appendConsoleLog(`\n❌ Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, true);
+  }
+}
+
+async function handleUpdateComposerPackage(name = '') {
+  clearConsoleLog();
+  const label = name ? `Updating global package: ${name}` : 'Updating all global packages';
+  openConsoleDrawer(label);
+  appendConsoleLog(`> composer global update ${name} --no-interaction\n`);
+
+  try {
+    const res = await window.api.updateComposerGlobalPackage({ packageName: name });
+    const spinner = document.getElementById('composer-console-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
+    if (res && res.success) {
+      appendConsoleLog('\n✔ Update completed successfully!');
+      showToast(name ? `✔ Successfully updated ${name}!` : '✔ All packages updated!');
+      await loadComposerTab(true);
+    } else {
+      appendConsoleLog(`\n❌ Update failed: ${res ? res.error : 'Unknown error'}`);
+      showToast('Update failed', true);
+    }
+  } catch (err) {
+    const spinner = document.getElementById('composer-console-spinner');
+    if (spinner) spinner.classList.add('hidden');
+    appendConsoleLog(`\n❌ Error: ${err.message}`);
+    showToast(`Error: ${err.message}`, true);
+  }
 }

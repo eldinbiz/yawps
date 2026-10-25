@@ -18,6 +18,14 @@ export function FullCleanup(arg1) {
   return window['go']['main']['App']['FullCleanup'](arg1);
 }
 
+export function GetComposerGlobalPackages() {
+  return window['go']['main']['App']['GetComposerGlobalPackages']();
+}
+
+export function GetComposerStatus() {
+  return window['go']['main']['App']['GetComposerStatus']();
+}
+
 export function GetDirectives(arg1) {
   return window['go']['main']['App']['GetDirectives'](arg1);
 }
@@ -30,12 +38,24 @@ export function GetState() {
   return window['go']['main']['App']['GetState']();
 }
 
+export function InstallComposer() {
+  return window['go']['main']['App']['InstallComposer']();
+}
+
+export function InstallComposerGlobalPackage(arg1) {
+  return window['go']['main']['App']['InstallComposerGlobalPackage'](arg1);
+}
+
 export function InstallVersion(arg1) {
   return window['go']['main']['App']['InstallVersion'](arg1);
 }
 
 export function OpenFolder(arg1) {
   return window['go']['main']['App']['OpenFolder'](arg1);
+}
+
+export function RemoveComposerGlobalPackage(arg1) {
+  return window['go']['main']['App']['RemoveComposerGlobalPackage'](arg1);
 }
 
 export function RemovePath() {
@@ -50,8 +70,24 @@ export function SwitchVersion(arg1) {
   return window['go']['main']['App']['SwitchVersion'](arg1);
 }
 
+export function ToggleComposerGlobalBinPath(arg1) {
+  return window['go']['main']['App']['ToggleComposerGlobalBinPath'](arg1);
+}
+
+export function UninstallComposer(arg1) {
+  return window['go']['main']['App']['UninstallComposer'](arg1);
+}
+
 export function UninstallVersion(arg1) {
   return window['go']['main']['App']['UninstallVersion'](arg1);
+}
+
+export function UpdateComposer() {
+  return window['go']['main']['App']['UpdateComposer']();
+}
+
+export function UpdateComposerGlobalPackage(arg1) {
+  return window['go']['main']['App']['UpdateComposerGlobalPackage'](arg1);
 }
 
 export function UpdateDirectives(arg1) {

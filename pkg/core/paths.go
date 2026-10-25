@@ -7,6 +7,7 @@ import (
 
 var (
 	baseDir      string
+	binDir       string
 	versionsDir  string
 	currentLink  string
 	downloadsDir string
@@ -43,6 +44,7 @@ func init() {
 		}
 	}
 
+	binDir = filepath.Join(baseDir, "bin")
 	versionsDir = filepath.Join(baseDir, "versions")
 	currentLink = filepath.Join(baseDir, "current")
 	downloadsDir = filepath.Join(baseDir, "downloads")
@@ -51,6 +53,10 @@ func init() {
 
 func GetBaseDir() string {
 	return baseDir
+}
+
+func GetBinDir() string {
+	return binDir
 }
 
 func GetVersionsDir() string {
@@ -70,7 +76,7 @@ func GetConfigFile() string {
 }
 
 func EnsureDirectories() error {
-	for _, dir := range []string{baseDir, versionsDir, downloadsDir} {
+	for _, dir := range []string{baseDir, binDir, versionsDir, downloadsDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}

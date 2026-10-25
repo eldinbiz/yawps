@@ -9,6 +9,7 @@ A fast, lightweight, and portable Windows desktop application and CLI tool to do
 - **Automatic Download & Setup**: Downloads official precompiled Windows binaries (PHP 7.4 through PHP 8.5+) directly from [windows.php.net](https://windows.php.net/downloads/releases/) with SHA256 checksum verification.
 - **Instant Version Switching**: Switches active PHP versions atomically using NTFS directory junctions (`%USERPROFILE%\.yawps\current`) with no restart or administrator rights needed.
 - **Extension & Directive Management**: Easily toggle common extensions (`curl`, `mbstring`, `openssl`, `xdebug`, `opcache`, etc.) and adjust `php.ini` directives graphically or via CLI.
+- **Composer Dependency Manager**: Check if Composer is installed and up to date, 1-click install/update official Composer, graphically manage globally installed PHP packages (Laravel Installer, Pest, PHPStan, PHPUnit, Rector, etc.), and cleanly uninstall with cache and PATH purging.
 - **Dual Interface**: Run as a modern Windows 11 Fluent desktop app or as a command-line tool in PowerShell / CMD.
 - **One-Click Patch Updates**: Detect and upgrade installed versions to newer official patch releases while preserving custom configuration.
 

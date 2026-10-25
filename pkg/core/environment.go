@@ -285,9 +285,33 @@ func broadcastSettingChange() {
 	)
 }
 
-func AddToUserPath() error {
-	curLink := GetCurrentLink()
-	normLink := strings.ToLower(filepath.Clean(curLink))
+func IsDirectoryInUserPath(targetDir string) bool {
+	if strings.TrimSpace(targetDir) == "" {
+		return false
+	}
+	normTarget := strings.ToLower(filepath.Clean(targetDir))
+	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE)
+	if err != nil {
+		return false
+	}
+	defer k.Close()
+
+	userPath, _, _ := k.GetStringValue("Path")
+	parts := strings.Split(userPath, ";")
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" && strings.ToLower(filepath.Clean(trimmed)) == normTarget {
+			return true
+		}
+	}
+	return false
+}
+
+func AddDirectoryToUserPath(targetDir string) error {
+	if strings.TrimSpace(targetDir) == "" {
+		return nil
+	}
+	normTarget := strings.ToLower(filepath.Clean(targetDir))
 
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.READ|registry.WRITE)
 	if err != nil {
@@ -300,13 +324,12 @@ func AddToUserPath() error {
 	var cleaned []string
 	for _, p := range parts {
 		trimmed := strings.TrimSpace(p)
-		if trimmed != "" && strings.ToLower(trimmed) != normLink {
+		if trimmed != "" && strings.ToLower(filepath.Clean(trimmed)) != normTarget {
 			cleaned = append(cleaned, trimmed)
 		}
 	}
 
-	// Prepend current junction
-	newParts := append([]string{curLink}, cleaned...)
+	newParts := append([]string{targetDir}, cleaned...)
 	newPath := strings.Join(newParts, ";")
 
 	if err := k.SetStringValue("Path", newPath); err != nil {
@@ -317,9 +340,11 @@ func AddToUserPath() error {
 	return nil
 }
 
-func RemoveFromUserPath() error {
-	curLink := GetCurrentLink()
-	normLink := strings.ToLower(filepath.Clean(curLink))
+func RemoveDirectoryFromUserPath(targetDir string) error {
+	if strings.TrimSpace(targetDir) == "" {
+		return nil
+	}
+	normTarget := strings.ToLower(filepath.Clean(targetDir))
 
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.READ|registry.WRITE)
 	if err != nil {
@@ -332,7 +357,7 @@ func RemoveFromUserPath() error {
 	var cleaned []string
 	for _, p := range parts {
 		trimmed := strings.TrimSpace(p)
-		if trimmed != "" && strings.ToLower(trimmed) != normLink {
+		if trimmed != "" && strings.ToLower(filepath.Clean(trimmed)) != normTarget {
 			cleaned = append(cleaned, trimmed)
 		}
 	}
@@ -344,4 +369,12 @@ func RemoveFromUserPath() error {
 
 	broadcastSettingChange()
 	return nil
+}
+
+func AddToUserPath() error {
+	return AddDirectoryToUserPath(GetCurrentLink())
+}
+
+func RemoveFromUserPath() error {
+	return RemoveDirectoryFromUserPath(GetCurrentLink())
 }

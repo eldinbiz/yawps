@@ -220,6 +220,107 @@ func (a *App) FullCleanup(payload map[string]interface{}) core.CleanupResult {
 	return core.FullCleanup(purgeAll)
 }
 
+func (a *App) GetComposerStatus() (*core.ComposerStatus, error) {
+	return core.GetComposerStatus()
+}
+
+func (a *App) InstallComposer() (*core.ComposerOperationResult, error) {
+	onProgress := func(p core.ProgressInfo) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "composer-progress", map[string]interface{}{
+				"stage":         p.Stage,
+				"percent":       p.Percent,
+				"message":       p.Message,
+				"receivedBytes": p.ReceivedBytes,
+				"totalBytes":    p.TotalBytes,
+			})
+		}
+	}
+	return core.InstallComposer(onProgress)
+}
+
+func (a *App) UpdateComposer() (*core.ComposerOperationResult, error) {
+	onProgress := func(p core.ProgressInfo) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "composer-progress", map[string]interface{}{
+				"stage":         p.Stage,
+				"percent":       p.Percent,
+				"message":       p.Message,
+				"receivedBytes": p.ReceivedBytes,
+				"totalBytes":    p.TotalBytes,
+			})
+		}
+	}
+	return core.UpdateComposer(onProgress)
+}
+
+func (a *App) UninstallComposer(payload map[string]interface{}) (*core.ComposerUninstallResult, error) {
+	opts := core.ComposerUninstallOptions{
+		RemoveBin:               getBool(payload, "removeBin", true),
+		RemoveFromPath:          getBool(payload, "removeFromPath", true),
+		CleanCache:              getBool(payload, "cleanCache", true),
+		PurgePackages:           getBool(payload, "purgePackages", false),
+		RemoveGlobalBinFromPath: getBool(payload, "removeGlobalBinFromPath", false),
+	}
+	return core.UninstallComposer(opts)
+}
+
+func (a *App) GetComposerGlobalPackages() ([]core.ComposerGlobalPackage, error) {
+	return core.GetComposerGlobalPackages()
+}
+
+func (a *App) InstallComposerGlobalPackage(payload map[string]interface{}) (*core.ComposerOperationResult, error) {
+	pkgName := getString(payload, "packageName")
+	version := getString(payload, "version")
+
+	onProgress := func(line string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "composer-log", map[string]interface{}{
+				"text": line,
+			})
+		}
+	}
+	return core.InstallComposerGlobalPackage(pkgName, version, onProgress)
+}
+
+func (a *App) RemoveComposerGlobalPackage(payload map[string]interface{}) (*core.ComposerOperationResult, error) {
+	pkgName := getString(payload, "packageName")
+
+	onProgress := func(line string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "composer-log", map[string]interface{}{
+				"text": line,
+			})
+		}
+	}
+	return core.RemoveComposerGlobalPackage(pkgName, onProgress)
+}
+
+func (a *App) UpdateComposerGlobalPackage(payload map[string]interface{}) (*core.ComposerOperationResult, error) {
+	pkgName := getString(payload, "packageName")
+
+	onProgress := func(line string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "composer-log", map[string]interface{}{
+				"text": line,
+			})
+		}
+	}
+	return core.UpdateComposerGlobalPackage(pkgName, onProgress)
+}
+
+func (a *App) ToggleComposerGlobalBinPath(payload map[string]interface{}) (bool, error) {
+	enable := getBool(payload, "enable", true)
+	return core.ToggleComposerGlobalBinPath(enable)
+}
+
+func getBool(m map[string]interface{}, key string, def bool) bool {
+	if val, ok := m[key].(bool); ok {
+		return val
+	}
+	return def
+}
+
 func getString(m map[string]interface{}, key string) string {
 	if val, ok := m[key].(string); ok {
 		return val
