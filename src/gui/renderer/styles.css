@@ -1412,49 +1412,136 @@ input:checked + .slider:before {
   margin-bottom: 16px;
 }
 
-/* PACKAGES GRID */
-.composer-packages-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.composer-pkg-card {
-  background: var(--bg-card);
+/* LIST HEADER & BULK ACTION BAR */
+.packages-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 13px;
   transition: all 0.2s ease;
 }
 
-.composer-pkg-card:hover {
+.list-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.custom-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.custom-checkbox-label input[type="checkbox"] {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent-cyan);
+}
+
+.custom-checkbox-label:hover {
+  color: #fff;
+}
+
+.selected-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* CONDENSED PACKAGES LIST */
+.composer-packages-list,
+.composer-packages-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.composer-pkg-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.15s ease;
+}
+
+.composer-pkg-row:hover {
   border-color: var(--border-active);
   background: var(--bg-card-hover);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
-.pkg-header {
+.composer-pkg-row.selected {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.08);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.08);
+}
+
+.pkg-select-col {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.pkg-title {
-  font-size: 15px;
+.pkg-select-col input[type="checkbox"] {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent-cyan);
+}
+
+.pkg-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pkg-row-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pkg-row-title {
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
-  word-break: break-all;
+  letter-spacing: -0.2px;
 }
 
-.pkg-badges {
+.pkg-row-badges {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .pkg-ver-badge {
@@ -1478,28 +1565,13 @@ input:checked + .slider:before {
   border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
-.pkg-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.45;
-  margin-bottom: 12px;
-  flex: 1;
-}
-
-.pkg-meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-  font-size: 11px;
-}
-
 .pkg-bin-tag {
   background: rgba(255, 255, 255, 0.05);
   padding: 2px 6px;
   border-radius: 4px;
   color: var(--accent-amber);
   font-family: Consolas, monospace;
+  font-size: 11px;
   border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
@@ -1508,14 +1580,23 @@ input:checked + .slider:before {
   padding: 2px 6px;
   border-radius: 4px;
   color: var(--text-dim);
+  font-size: 11px;
 }
 
-.pkg-actions {
+.pkg-row-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pkg-row-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 12px;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .btn-xs {

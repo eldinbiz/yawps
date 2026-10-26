@@ -481,10 +481,32 @@
                 <span class="search-icon">🔍</span>
                 <input type="text" id="input-pkg-search" placeholder="Filter installed global packages by name or description...">
               </div>
+
+              <!-- List Header & Bulk Selection Bar -->
+              <div class="packages-list-header" id="packages-list-header">
+                <div class="list-header-left">
+                  <label class="custom-checkbox-label">
+                    <input type="checkbox" id="composer-select-all" title="Select all visible packages">
+                    <span class="select-all-text">Select All (<span id="composer-visible-count">0</span>)</span>
+                  </label>
+                  <span id="composer-selected-badge" class="selected-badge hidden">0 selected</span>
+                </div>
+                <div class="list-header-actions">
+                  <button id="btn-composer-update-selected" class="btn btn-xs btn-secondary hidden" title="Update selected packages">
+                    🔄 Update Selected (<span class="selected-count-num">0</span>)
+                  </button>
+                  <button id="btn-composer-remove-selected" class="btn btn-xs btn-danger hidden" title="Remove selected packages">
+                    🗑️ Remove Selected (<span class="selected-count-num">0</span>)
+                  </button>
+                  <button id="btn-composer-clear-selection" class="btn btn-xs btn-text hidden" title="Deselect all packages">
+                    Deselect
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <!-- Packages Cards Grid -->
-            <div id="composer-packages-grid" class="composer-packages-grid">
+            <!-- Condensed Packages List -->
+            <div id="composer-packages-list" class="composer-packages-list">
               <!-- Dynamically populated -->
             </div>
 

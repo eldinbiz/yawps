@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os/exec"
+	"strings"
 	"yawps/pkg/core"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -284,7 +285,12 @@ func (a *App) InstallComposerGlobalPackage(payload map[string]interface{}) (*cor
 }
 
 func (a *App) RemoveComposerGlobalPackage(payload map[string]interface{}) (*core.ComposerOperationResult, error) {
-	pkgName := getString(payload, "packageName")
+	var pkgs []string
+	if names := getStringSlice(payload, "packageNames"); len(names) > 0 {
+		pkgs = names
+	} else if name := getString(payload, "packageName"); strings.TrimSpace(name) != "" {
+		pkgs = []string{strings.TrimSpace(name)}
+	}
 
 	onProgress := func(line string) {
 		if a.ctx != nil {
@@ -293,11 +299,16 @@ func (a *App) RemoveComposerGlobalPackage(payload map[string]interface{}) (*core
 			})
 		}
 	}
-	return core.RemoveComposerGlobalPackage(pkgName, onProgress)
+	return core.RemoveComposerGlobalPackages(pkgs, onProgress)
 }
 
 func (a *App) UpdateComposerGlobalPackage(payload map[string]interface{}) (*core.ComposerOperationResult, error) {
-	pkgName := getString(payload, "packageName")
+	var pkgs []string
+	if names := getStringSlice(payload, "packageNames"); len(names) > 0 {
+		pkgs = names
+	} else if name := getString(payload, "packageName"); strings.TrimSpace(name) != "" {
+		pkgs = []string{strings.TrimSpace(name)}
+	}
 
 	onProgress := func(line string) {
 		if a.ctx != nil {
@@ -306,7 +317,7 @@ func (a *App) UpdateComposerGlobalPackage(payload map[string]interface{}) (*core
 			})
 		}
 	}
-	return core.UpdateComposerGlobalPackage(pkgName, onProgress)
+	return core.UpdateComposerGlobalPackages(pkgs, onProgress)
 }
 
 func (a *App) ToggleComposerGlobalBinPath(payload map[string]interface{}) (bool, error) {
@@ -326,4 +337,28 @@ func getString(m map[string]interface{}, key string) string {
 		return val
 	}
 	return ""
+}
+
+func getStringSlice(m map[string]interface{}, key string) []string {
+	if val, ok := m[key]; ok {
+		if slice, ok := val.([]interface{}); ok {
+			var res []string
+			for _, item := range slice {
+				if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+					res = append(res, strings.TrimSpace(s))
+				}
+			}
+			return res
+		}
+		if slice, ok := val.([]string); ok {
+			var res []string
+			for _, s := range slice {
+				if strings.TrimSpace(s) != "" {
+					res = append(res, strings.TrimSpace(s))
+				}
+			}
+			return res
+		}
+	}
+	return nil
 }

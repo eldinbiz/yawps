@@ -2,9 +2,12 @@ package core
 
 import (
 	"bufio"
+	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -164,12 +168,30 @@ func FindComposerExecutable() (composerBat string, composerPhar string, isYawpsM
 
 // FetchLatestComposerVersion fetches the latest stable Composer version metadata from getcomposer.org
 func FetchLatestComposerVersion() (string, string, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
+	dialer := &net.Dialer{
+		Timeout:   3 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			// Enforce IPv4 to avoid IPv6 hang on Windows systems without active IPv6 routes
+			return dialer.DialContext(ctx, "tcp4", addr)
+		},
+		TLSNextProto:          make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
+		ResponseHeaderTimeout: 3 * time.Second,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   4 * time.Second,
+	}
+
 	req, err := http.NewRequest("GET", "https://getcomposer.org/versions", nil)
 	if err != nil {
 		return "", "", err
 	}
-	req.Header.Set("User-Agent", "YAWPS-PHP-Switcher")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) YAWPS/1.0")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -229,7 +251,10 @@ func compareVersions(v1, v2 string) int {
 	return 0
 }
 
-var composerVersionRegex = regexp.MustCompile(`(?i)Composer (?:version )?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)(?: \(([^\)]+)\))? ([0-9]{4}-[0-9]{2}-[0-9]{2})?`)
+var (
+	ansiRegex            = regexp.MustCompile(`\[[0-9;]*[a-zA-Z]`)
+	composerVersionRegex = regexp.MustCompile(`(?i)Composer (?:version )?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)(?: \(([^\)]+)\))? ([0-9]{4}-[0-9]{2}-[0-9]{2})?`)
+)
 
 // GetComposerStatus returns current full status of Composer on the machine
 func GetComposerStatus() (*ComposerStatus, error) {
@@ -253,34 +278,50 @@ func GetComposerStatus() (*ComposerStatus, error) {
 
 	var version string
 	var releaseDate string
+	var latestVersion string
 
-	if isInstalled {
-		// Attempt to extract version
-		var cmd *exec.Cmd
-		if cur != nil && cur.PhpExe != "" && composerPhar != "" {
-			cmd = exec.Command(cur.PhpExe, composerPhar, "--version")
-		} else if composerBat != "" {
-			cmd = exec.Command("cmd.exe", "/c", composerBat, "--version")
+	var wg sync.WaitGroup
+
+	// 1. Fetch latest version online in parallel
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if lv, _, err := FetchLatestComposerVersion(); err == nil {
+			latestVersion = lv
 		}
+	}()
 
-		if cmd != nil {
-			cmd.Env = os.Environ()
-			// Ensure current PHP is in PATH for child process
-			cmd.Env = append(cmd.Env, "PATH="+GetCurrentLink()+";"+GetBinDir()+";"+os.Getenv("PATH"))
-			if out, err := cmd.Output(); err == nil {
-				matches := composerVersionRegex.FindStringSubmatch(string(out))
-				if len(matches) > 1 {
-					version = matches[1]
-				}
-				if len(matches) > 3 && matches[3] != "" {
-					releaseDate = matches[3]
+	// 2. Extract local Composer version in parallel
+	if isInstalled {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var cmd *exec.Cmd
+			if cur != nil && cur.PhpExe != "" && composerPhar != "" {
+				cmd = exec.Command(cur.PhpExe, composerPhar, "--version", "--no-ansi")
+			} else if composerBat != "" {
+				cmd = exec.Command("cmd.exe", "/c", composerBat, "--version", "--no-ansi")
+			}
+
+			if cmd != nil {
+				cmd.Env = os.Environ()
+				cmd.Env = append(cmd.Env, "PATH="+GetCurrentLink()+";"+GetBinDir()+";"+os.Getenv("PATH"))
+				if out, err := cmd.Output(); err == nil {
+					cleanOut := ansiRegex.ReplaceAllString(string(out), "")
+					matches := composerVersionRegex.FindStringSubmatch(cleanOut)
+					if len(matches) > 1 {
+						version = matches[1]
+					}
+					if len(matches) > 3 && matches[3] != "" {
+						releaseDate = matches[3]
+					}
 				}
 			}
-		}
+		}()
 	}
 
-	// Check latest version online
-	latestVersion, _, _ := FetchLatestComposerVersion()
+	wg.Wait()
+
 	isUpToDate := false
 	if isInstalled && version != "" && latestVersion != "" {
 		isUpToDate = compareVersions(version, latestVersion) >= 0
@@ -762,27 +803,58 @@ func InstallComposerGlobalPackage(pkgName string, version string, onProgress fun
 	return RunComposerCommand(args, onProgress)
 }
 
+// RemoveComposerGlobalPackages removes one or more global packages via composer
+func RemoveComposerGlobalPackages(pkgNames []string, onProgress func(string)) (*ComposerOperationResult, error) {
+	var valid []string
+	for _, p := range pkgNames {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			valid = append(valid, p)
+		}
+	}
+	if len(valid) == 0 {
+		return nil, fmt.Errorf("no package names provided for removal")
+	}
+
+	args := append([]string{"global", "remove"}, valid...)
+	args = append(args, "--no-interaction")
+	return RunComposerCommand(args, onProgress)
+}
+
 // RemoveComposerGlobalPackage removes a global package via composer
 func RemoveComposerGlobalPackage(pkgName string, onProgress func(string)) (*ComposerOperationResult, error) {
 	pkgName = strings.TrimSpace(pkgName)
 	if pkgName == "" {
 		return nil, fmt.Errorf("package name cannot be empty")
 	}
+	return RemoveComposerGlobalPackages([]string{pkgName}, onProgress)
+}
 
-	args := []string{"global", "remove", pkgName, "--no-interaction"}
+// UpdateComposerGlobalPackages updates one or more global packages or all global packages
+func UpdateComposerGlobalPackages(pkgNames []string, onProgress func(string)) (*ComposerOperationResult, error) {
+	var valid []string
+	for _, p := range pkgNames {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			valid = append(valid, p)
+		}
+	}
+	var args []string
+	if len(valid) > 0 {
+		args = append([]string{"global", "update"}, valid...)
+		args = append(args, "--no-interaction")
+	} else {
+		args = []string{"global", "update", "--no-interaction"}
+	}
 	return RunComposerCommand(args, onProgress)
 }
 
 // UpdateComposerGlobalPackage updates a global package or all global packages
 func UpdateComposerGlobalPackage(pkgName string, onProgress func(string)) (*ComposerOperationResult, error) {
-	pkgName = strings.TrimSpace(pkgName)
-	var args []string
-	if pkgName != "" {
-		args = []string{"global", "update", pkgName, "--no-interaction"}
-	} else {
-		args = []string{"global", "update", "--no-interaction"}
+	if strings.TrimSpace(pkgName) == "" {
+		return UpdateComposerGlobalPackages(nil, onProgress)
 	}
-	return RunComposerCommand(args, onProgress)
+	return UpdateComposerGlobalPackages([]string{pkgName}, onProgress)
 }
 
 // ToggleComposerGlobalBinPath adds or removes composer global bin from user PATH
