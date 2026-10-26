@@ -11,9 +11,9 @@
     "start": "electron src/gui/main.js",
     "gui": "electron src/gui/main.js",
     "cli": "node bin/yawps.js",
-    "build:wails": "powershell -NoProfile -Command \"$env:Path = 'C:\\Program Files\\Go\\bin;C:\\Users\\eldin\\go\\bin;' + $env:Path; wails build; if (Test-Path build\\bin\\yawps.exe) { New-Item -ItemType Directory -Force -Path dist | Out-Null; Copy-Item build\\bin\\yawps.exe dist\\yawps.exe -Force }\"",
-    "build:wails:upx": "powershell -NoProfile -Command \"$env:Path = 'C:\\Program Files\\Go\\bin;C:\\Users\\eldin\\go\\bin;' + $env:Path; wails build -upx; if (Test-Path build\\bin\\yawps.exe) { New-Item -ItemType Directory -Force -Path dist | Out-Null; Copy-Item build\\bin\\yawps.exe dist\\yawps.exe -Force }\"",
-    "dist:wails": "powershell -NoProfile -Command \"$env:Path = 'C:\\Program Files\\Go\\bin;C:\\Users\\eldin\\go\\bin;' + $env:Path; wails build -upx; if (Test-Path build\\bin\\yawps.exe) { New-Item -ItemType Directory -Force -Path dist | Out-Null; Copy-Item build\\bin\\yawps.exe dist\\yawps.exe -Force }\"",
+    "build:wails": "build.cmd",
+    "build:wails:upx": "build.cmd -upx",
+    "dist:wails": "build.cmd -upx",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --win portable",
     "dist:nsis": "electron-builder --win nsis"
