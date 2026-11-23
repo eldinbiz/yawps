@@ -1,0 +1,186 @@
+name: Build Windows Portable Executables
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_electron:
+        description: "Also build Electron portable executable"
+        required: false
+        type: boolean
+        default: false
+      retention_days:
+        description: "Artifact retention (days)"
+        required: false
+        type: choice
+        default: "14"
+        options:
+          - "7"
+          - "14"
+          - "30"
+          - "90"
+
+run-name: "Build Windows (Wails${{ (inputs.build_electron == true || inputs.build_electron == 'true') && ' + Electron' || '' }}) on ${{ github.ref_name }}"
+
+permissions:
+  contents: read
+
+jobs:
+  build-wails:
+    name: Build Wails Portable (windows/amd64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Resolve build metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $wails = Get-Content -Raw wails.json | ConvertFrom-Json
+          $version = if ($wails.info -and $wails.info.productVersion) { $wails.info.productVersion } else { "0.1.0" }
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $safeBranch = "${{ github.ref_name }}" -replace '[^a-zA-Z0-9._-]', '-'
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "short_sha=$shortSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "safe_branch=$safeBranch" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Verify Go packages
+        shell: pwsh
+        run: go vet ./...
+
+      - name: Install Wails CLI v2.17.0
+        shell: pwsh
+        run: |
+          $gopathBin = Join-Path (go env GOPATH) "bin"
+          $gopathBin | Out-File -FilePath $env:GITHUB_PATH -Append
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+          & (Join-Path $gopathBin "wails.exe") version
+
+      - name: Build Wails executable (uncompressed windows/amd64)
+        shell: pwsh
+        run: wails build -clean -platform windows/amd64 -trimpath
+
+      - name: Smoke-test CLI entrypoint
+        shell: pwsh
+        run: |
+          $exe = "build\bin\yawps.exe"
+          if (-not (Test-Path $exe)) { throw "Expected binary not found: $exe" }
+          $verOutput = & .\$exe --version 2>&1 | Out-String
+          Write-Host "CLI --version output: $verOutput"
+          if ($LASTEXITCODE -ne 0) { throw "yawps.exe --version exited with code $LASTEXITCODE" }
+
+      - name: Package .exe, .zip, and SHA256 checksums
+        id: pkg
+        shell: pwsh
+        run: |
+          $version = "${{ steps.meta.outputs.version }}"
+          $stageDir = Join-Path "${{ runner.temp }}" "artifacts\wails"
+          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+          $exeSrc = "build\bin\yawps.exe"
+          $exeDst = Join-Path $stageDir "yawps.exe"
+          $zipDst = Join-Path $stageDir "yawps-v$version-windows-amd64-wails.zip"
+          $sumDst = Join-Path $stageDir "yawps-wails-windows-amd64.sha256"
+
+          Copy-Item -Path $exeSrc -Destination $exeDst -Force
+          Compress-Archive -Path $exeDst -DestinationPath $zipDst -Force
+
+          $hashes = Get-ChildItem -Path $stageDir -File | Sort-Object Name | ForEach-Object {
+            $h = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$h  $($_.Name)"
+          }
+          $hashes | Set-Content -Path $sumDst -Encoding ascii
+          Get-Content $sumDst
+
+          "stage_dir=$stageDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload Wails portable artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: yawps-wails-windows-amd64-${{ steps.meta.outputs.safe_branch }}-${{ steps.meta.outputs.short_sha }}
+          path: ${{ steps.pkg.outputs.stage_dir }}
+          if-no-files-found: error
+          retention-days: ${{ fromJSON(inputs.retention_days) }}
+
+  build-electron:
+    name: Build Electron Portable (windows/amd64)
+    if: ${{ inputs.build_electron == true || inputs.build_electron == 'true' }}
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Resolve build metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $pkg = Get-Content -Raw package.json | ConvertFrom-Json
+          $version = if ($pkg.version) { $pkg.version } else { "0.1.0" }
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $safeBranch = "${{ github.ref_name }}" -replace '[^a-zA-Z0-9._-]', '-'
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "short_sha=$shortSha" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "safe_branch=$safeBranch" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Install dependencies
+        shell: pwsh
+        run: npm ci
+
+      - name: Smoke-test Node CLI entrypoint
+        shell: pwsh
+        run: node bin/yawps.js --version
+
+      - name: Build Electron portable executable (windows/amd64)
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --win portable --x64
+
+      - name: Package .exe, .zip, and SHA256 checksums
+        id: pkg
+        shell: pwsh
+        run: |
+          $version = "${{ steps.meta.outputs.version }}"
+          $stageDir = Join-Path "${{ runner.temp }}" "artifacts\electron"
+          New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+
+          $exeFile = Get-ChildItem -Path "dist" -Filter "*-portable.exe" | Select-Object -First 1
+          if (-not $exeFile) { throw "Expected Electron portable executable not found in dist/" }
+
+          $exeDst = Join-Path $stageDir $exeFile.Name
+          $zipDst = Join-Path $stageDir "yawps-v$version-windows-amd64-electron-portable.zip"
+          $sumDst = Join-Path $stageDir "yawps-electron-windows-amd64.sha256"
+
+          Copy-Item -Path $exeFile.FullName -Destination $exeDst -Force
+          Compress-Archive -Path $exeDst -DestinationPath $zipDst -Force
+
+          $hashes = Get-ChildItem -Path $stageDir -File | Sort-Object Name | ForEach-Object {
+            $h = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$h  $($_.Name)"
+          }
+          $hashes | Set-Content -Path $sumDst -Encoding ascii
+          Get-Content $sumDst
+
+          "stage_dir=$stageDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload Electron portable artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: yawps-electron-windows-amd64-${{ steps.meta.outputs.safe_branch }}-${{ steps.meta.outputs.short_sha }}
+          path: ${{ steps.pkg.outputs.stage_dir }}
+          if-no-files-found: error
+          retention-days: ${{ fromJSON(inputs.retention_days) }}

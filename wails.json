@@ -8,5 +8,12 @@
   "frontend:dir": "src/gui/renderer",
   "author": {
     "name": "YAWPS"
+  },
+  "info": {
+    "companyName": "YAWPS",
+    "productName": "YAWPS - Yet Another Windows PHP Switcher",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 YAWPS",
+    "comments": "Portable Windows PHP Version Manager"
   }
 }

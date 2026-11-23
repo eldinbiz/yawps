@@ -37,8 +37,14 @@
       "output": "dist"
     },
     "win": {
+      "icon": "build/windows/icon.ico",
       "target": [
-        "portable"
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "files": [
