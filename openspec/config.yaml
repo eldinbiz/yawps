@@ -1,0 +1,27 @@
+schema: spec-driven
+skillsScope: project
+
+context: |
+  Target platform: Windows 10 and Windows 11 (windows/amd64) running strictly with standard user permissions (zero UAC elevation, no administrator rights).
+  Dual runtime architecture sharing src/gui/renderer/: Go/Wails v2 (primary: main.go, app.go, pkg/) and Node/Electron (src/, bin/).
+  Keep Go and Node/Electron CLI + backend feature parity and src/gui/renderer/bridge.js bindings aligned unless a change explicitly targets only one runtime.
+  Preserve zero-UAC portable build support (build.sh / build.cmd with .tools/) and legacy %USERPROFILE%\.win-php fallback compatibility alongside %USERPROFILE%\.yawps.
+
+rules:
+  proposal:
+    - State explicitly whether the change affects Go/Wails, Node/Electron, the shared UI, or all of them.
+    - Note any Windows OS APIs, NTFS directory junctions, User PATH registry edits, or zero-UAC constraints.
+  specs:
+    - Include scenarios covering Windows error/fallback behavior and CLI/GUI parity where applicable.
+  design:
+    - Document bridge.js, app.go, and src/gui/preload.js contract changes whenever IPC or Wails bindings change.
+  tasks:
+    - Include runtime-appropriate verification steps (e.g., Windows-targeted go vet / build checks and CLI smoke checks).
+
+operations:
+  apply:
+    guidance:
+      - Run GOOS=windows GOARCH=amd64 go vet ./... when Go files change, and keep Go and Node/Electron parity unless scoped otherwise.
+  archive:
+    guidance:
+      - Run openspec validate --all --strict before archiving and summarize the shipped changes.
