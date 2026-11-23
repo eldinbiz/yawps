@@ -17,6 +17,7 @@ let currentFlavor = 'nts'; // default NTS
 let selectedBranch = 'all';
 let selectedCategory = 'all';
 let pendingUninstallItem = null;
+const selectedComposerPackages = new Set();
 
 // DOM Elements
 const activeVersionNameEl = document.getElementById('active-version-name');
@@ -437,6 +438,56 @@ function setupEventListeners() {
   if (inputPkgSearch) {
     inputPkgSearch.addEventListener('input', (e) => {
       renderComposerPackages(e.target.value);
+    });
+  }
+
+  const selectAllCb = document.getElementById('composer-select-all');
+  if (selectAllCb) {
+    selectAllCb.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      const inputSearch = document.getElementById('input-pkg-search');
+      const filter = inputSearch ? inputSearch.value : '';
+      const packages = (appState.composer && appState.composer.packages) ? appState.composer.packages : [];
+      const normalizedFilter = filter.toLowerCase().trim();
+      const visiblePackages = packages.filter(p => {
+        if (!normalizedFilter) return true;
+        return (p.name || '').toLowerCase().includes(normalizedFilter) ||
+               (p.description || '').toLowerCase().includes(normalizedFilter);
+      });
+
+      if (isChecked) {
+        visiblePackages.forEach(p => selectedComposerPackages.add(p.name));
+      } else {
+        visiblePackages.forEach(p => selectedComposerPackages.delete(p.name));
+      }
+      renderComposerPackages(filter);
+    });
+  }
+
+  const btnUpdateSelected = document.getElementById('btn-composer-update-selected');
+  if (btnUpdateSelected) {
+    btnUpdateSelected.addEventListener('click', async () => {
+      const selected = Array.from(selectedComposerPackages);
+      if (selected.length === 0) return;
+      await handleUpdateComposerPackages(selected);
+    });
+  }
+
+  const btnRemoveSelected = document.getElementById('btn-composer-remove-selected');
+  if (btnRemoveSelected) {
+    btnRemoveSelected.addEventListener('click', async () => {
+      const selected = Array.from(selectedComposerPackages);
+      if (selected.length === 0) return;
+      await handleRemoveComposerPackages(selected);
+    });
+  }
+
+  const btnClearSelection = document.getElementById('btn-composer-clear-selection');
+  if (btnClearSelection) {
+    btnClearSelection.addEventListener('click', () => {
+      selectedComposerPackages.clear();
+      const inputSearch = document.getElementById('input-pkg-search');
+      renderComposerPackages(inputSearch ? inputSearch.value : '');
     });
   }
 
@@ -1152,7 +1203,11 @@ async function loadComposerTab(force = false) {
     if (elVersion) elVersion.textContent = status.version ? `v${status.version} (${status.releaseDate || 'official'})` : 'Not installed';
 
     const elLatest = document.getElementById('comp-val-latest');
-    if (elLatest) elLatest.textContent = status.latestVersion ? `v${status.latestVersion} (stable)` : 'Checking...';
+    if (elLatest) {
+      elLatest.textContent = status.latestVersion
+        ? `v${status.latestVersion} (stable)`
+        : (status.installed ? 'Unavailable (offline)' : '—');
+    }
 
     const elPhp = document.getElementById('comp-val-php');
     if (elPhp) elPhp.textContent = status.activePhp || 'None (Select a PHP version)';
@@ -1203,6 +1258,16 @@ async function loadComposerTab(force = false) {
       navBadge.classList.toggle('hidden', pkgCount === 0);
     }
 
+    // Reconcile selected packages with current package list
+    if (appState.composer && appState.composer.packages) {
+      const existingNames = new Set(appState.composer.packages.map(p => p.name));
+      for (const name of selectedComposerPackages) {
+        if (!existingNames.has(name)) {
+          selectedComposerPackages.delete(name);
+        }
+      }
+    }
+
     // Render packages
     renderComposerPackages();
 
@@ -1219,14 +1284,16 @@ async function loadComposerTab(force = false) {
 }
 
 function renderComposerPackages(filter = '') {
-  const gridEl = document.getElementById('composer-packages-grid');
+  const listEl = document.getElementById('composer-packages-list') || document.getElementById('composer-packages-grid');
   const emptyEl = document.getElementById('composer-packages-empty');
-  if (!gridEl) return;
+  const headerEl = document.getElementById('packages-list-header');
+  if (!listEl) return;
 
-  gridEl.innerHTML = '';
+  listEl.innerHTML = '';
 
   if (appState.composer && appState.composer.status && !appState.composer.status.installed) {
     if (emptyEl) emptyEl.classList.add('hidden');
+    if (headerEl) headerEl.classList.add('hidden');
     return;
   }
 
@@ -1240,6 +1307,7 @@ function renderComposerPackages(filter = '') {
   });
 
   if (filtered.length === 0) {
+    if (headerEl) headerEl.classList.add('hidden');
     if (emptyEl) {
       emptyEl.classList.remove('hidden');
       if (normalizedFilter) {
@@ -1254,59 +1322,140 @@ function renderComposerPackages(filter = '') {
   }
 
   if (emptyEl) emptyEl.classList.add('hidden');
+  if (headerEl) headerEl.classList.remove('hidden');
 
+  // Sync Select All checkbox state
+  const visibleCount = filtered.length;
+  const visibleSelectedCount = filtered.filter(p => selectedComposerPackages.has(p.name)).length;
+  const selectAllCb = document.getElementById('composer-select-all');
+  const visibleCountEl = document.getElementById('composer-visible-count');
+  if (visibleCountEl) visibleCountEl.textContent = visibleCount;
+
+  if (selectAllCb) {
+    if (visibleCount === 0) {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = false;
+    } else if (visibleSelectedCount === visibleCount) {
+      selectAllCb.checked = true;
+      selectAllCb.indeterminate = false;
+    } else if (visibleSelectedCount > 0) {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = true;
+    } else {
+      selectAllCb.checked = false;
+      selectAllCb.indeterminate = false;
+    }
+  }
+
+  // Update selection status badges and bulk action buttons
+  const totalSelected = selectedComposerPackages.size;
+  const badgeEl = document.getElementById('composer-selected-badge');
+  const btnUpdateSelected = document.getElementById('btn-composer-update-selected');
+  const btnRemoveSelected = document.getElementById('btn-composer-remove-selected');
+  const btnClearSelection = document.getElementById('btn-composer-clear-selection');
+
+  if (badgeEl) {
+    if (totalSelected > 0) {
+      badgeEl.textContent = `${totalSelected} selected`;
+      badgeEl.classList.remove('hidden');
+    } else {
+      badgeEl.classList.add('hidden');
+    }
+  }
+
+  document.querySelectorAll('.selected-count-num').forEach(el => {
+    el.textContent = totalSelected;
+  });
+
+  if (btnUpdateSelected) {
+    btnUpdateSelected.classList.toggle('hidden', totalSelected === 0);
+  }
+  if (btnRemoveSelected) {
+    btnRemoveSelected.classList.toggle('hidden', totalSelected === 0);
+  }
+  if (btnClearSelection) {
+    btnClearSelection.classList.toggle('hidden', totalSelected === 0);
+  }
+
+  // Render condensed list rows
   filtered.forEach(pkg => {
-    const card = document.createElement('div');
-    card.className = 'composer-pkg-card';
+    const row = document.createElement('div');
+    const isSelected = selectedComposerPackages.has(pkg.name);
+    row.className = `composer-pkg-row${isSelected ? ' selected' : ''}`;
 
     const binTagsHtml = (pkg.binaries && pkg.binaries.length > 0)
       ? `<span class="pkg-bin-tag" title="CLI command available in terminal">⚡ ${escapeHtml(pkg.binaries.join(', '))}</span>`
       : '';
 
     const licenseHtml = (pkg.license && pkg.license.length > 0)
-      ? `<span class="pkg-license-tag">${escapeHtml(pkg.license.join(', '))}</span>`
+      ? `<span class="pkg-license-tag" title="License">${escapeHtml(pkg.license.join(', '))}</span>`
       : '';
 
     const constraintHtml = pkg.constraint
       ? `<span class="pkg-constraint-badge" title="Required Constraint">${escapeHtml(pkg.constraint)}</span>`
       : '';
 
-    card.innerHTML = `
-      <div>
-        <div class="pkg-header">
-          <div class="pkg-title">${escapeHtml(pkg.name)}</div>
-          <div class="pkg-badges">
+    row.innerHTML = `
+      <div class="pkg-select-col">
+        <input type="checkbox" class="pkg-checkbox" data-pkg="${escapeHtml(pkg.name)}"${isSelected ? ' checked' : ''} aria-label="Select ${escapeHtml(pkg.name)}">
+      </div>
+      <div class="pkg-row-main">
+        <div class="pkg-row-top">
+          <span class="pkg-row-title">${escapeHtml(pkg.name)}</span>
+          <div class="pkg-row-badges">
             <span class="pkg-ver-badge">${escapeHtml(pkg.version)}</span>
             ${constraintHtml}
+            ${binTagsHtml}
+            ${licenseHtml}
           </div>
         </div>
-        <div class="pkg-desc">${escapeHtml(pkg.description || 'No description provided.')}</div>
-        <div class="pkg-meta-row">
-          ${binTagsHtml}
-          ${licenseHtml}
-        </div>
+        <div class="pkg-row-desc" title="${escapeHtml(pkg.description || '')}">${escapeHtml(pkg.description || 'No description provided.')}</div>
       </div>
-      <div class="pkg-actions">
-        <button class="btn btn-xs btn-secondary btn-pkg-packagist">🌐 Packagist</button>
-        <button class="btn btn-xs btn-secondary btn-pkg-update">🔄 Update</button>
-        <button class="btn btn-xs btn-danger btn-pkg-remove">🗑️ Remove</button>
+      <div class="pkg-row-actions">
+        <button class="btn btn-xs btn-secondary btn-pkg-packagist" title="View on Packagist.org">🌐 Packagist</button>
+        <button class="btn btn-xs btn-secondary btn-pkg-update" title="Update ${escapeHtml(pkg.name)}">🔄 Update</button>
+        <button class="btn btn-xs btn-danger btn-pkg-remove" title="Remove ${escapeHtml(pkg.name)}">🗑️ Remove</button>
       </div>
     `;
 
-    card.querySelector('.btn-pkg-packagist').addEventListener('click', () => {
+    const cb = row.querySelector('.pkg-checkbox');
+    cb.addEventListener('change', (e) => {
+      e.stopPropagation();
+      if (cb.checked) {
+        selectedComposerPackages.add(pkg.name);
+      } else {
+        selectedComposerPackages.delete(pkg.name);
+      }
+      renderComposerPackages(filter);
+    });
+
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.pkg-row-actions') || e.target.closest('.pkg-select-col')) return;
+      if (selectedComposerPackages.has(pkg.name)) {
+        selectedComposerPackages.delete(pkg.name);
+      } else {
+        selectedComposerPackages.add(pkg.name);
+      }
+      renderComposerPackages(filter);
+    });
+
+    row.querySelector('.btn-pkg-packagist').addEventListener('click', (e) => {
+      e.stopPropagation();
       const url = `https://packagist.org/packages/${encodeURIComponent(pkg.name)}`;
       window.open(url, '_blank');
     });
 
-    card.querySelector('.btn-pkg-update').addEventListener('click', async () => {
+    row.querySelector('.btn-pkg-update').addEventListener('click', async (e) => {
+      e.stopPropagation();
       await handleUpdateComposerPackage(pkg.name);
     });
 
-    card.querySelector('.btn-pkg-remove').addEventListener('click', async () => {
+    row.querySelector('.btn-pkg-remove').addEventListener('click', async (e) => {
+      e.stopPropagation();
       await handleRemoveComposerPackage(pkg.name);
     });
 
-    gridEl.appendChild(card);
+    listEl.appendChild(row);
   });
 }
 
@@ -1376,27 +1525,39 @@ async function handleInstallComposerPackage(name, version = '') {
   }
 }
 
-async function handleRemoveComposerPackage(name) {
-  if (!confirm(`Are you sure you want to remove global package "${name}"?`)) {
+async function handleRemoveComposerPackages(names) {
+  if (!names || names.length === 0) return;
+
+  const count = names.length;
+  const confirmMsg = count === 1
+    ? `Are you sure you want to remove global package "${names[0]}"?`
+    : `Are you sure you want to remove ${count} global packages:\n• ${names.join('\n• ')}?`;
+
+  if (!confirm(confirmMsg)) {
     return;
   }
 
   clearConsoleLog();
-  openConsoleDrawer(`Removing global package: ${name}`);
-  appendConsoleLog(`> composer global remove ${name} --no-interaction\n`);
+  const label = count === 1 ? `Removing global package: ${names[0]}` : `Removing ${count} global packages`;
+  openConsoleDrawer(label);
+  appendConsoleLog(`> composer global remove ${names.join(' ')} --no-interaction\n`);
 
   try {
-    const res = await window.api.removeComposerGlobalPackage({ packageName: name });
+    const res = await window.api.removeComposerGlobalPackage({
+      packageName: names[0],
+      packageNames: names
+    });
     const spinner = document.getElementById('composer-console-spinner');
     if (spinner) spinner.classList.add('hidden');
 
     if (res && res.success) {
-      appendConsoleLog('\n✔ Package removed successfully!');
-      showToast(`✔ Successfully removed ${name}!`);
+      appendConsoleLog('\n✔ Package(s) removed successfully!');
+      showToast(count === 1 ? `✔ Successfully removed ${names[0]}!` : `✔ Successfully removed ${count} packages!`);
+      names.forEach(n => selectedComposerPackages.delete(n));
       await loadComposerTab(true);
     } else {
       appendConsoleLog(`\n❌ Removal failed: ${res ? res.error : 'Unknown error'}`);
-      showToast(`Failed to remove ${name}`, true);
+      showToast(count === 1 ? `Failed to remove ${names[0]}` : 'Failed to remove selected packages', true);
     }
   } catch (err) {
     const spinner = document.getElementById('composer-console-spinner');
@@ -1406,20 +1567,44 @@ async function handleRemoveComposerPackage(name) {
   }
 }
 
-async function handleUpdateComposerPackage(name = '') {
+async function handleRemoveComposerPackage(name) {
+  return handleRemoveComposerPackages([name]);
+}
+
+async function handleUpdateComposerPackages(names = []) {
   clearConsoleLog();
-  const label = name ? `Updating global package: ${name}` : 'Updating all global packages';
+  const count = names.length;
+  let label = 'Updating all global packages';
+  let cmdStr = 'composer global update --no-interaction';
+
+  if (count === 1) {
+    label = `Updating global package: ${names[0]}`;
+    cmdStr = `composer global update ${names[0]} --no-interaction`;
+  } else if (count > 1) {
+    label = `Updating ${count} global packages`;
+    cmdStr = `composer global update ${names.join(' ')} --no-interaction`;
+  }
+
   openConsoleDrawer(label);
-  appendConsoleLog(`> composer global update ${name} --no-interaction\n`);
+  appendConsoleLog(`> ${cmdStr}\n`);
 
   try {
-    const res = await window.api.updateComposerGlobalPackage({ packageName: name });
+    const res = await window.api.updateComposerGlobalPackage({
+      packageName: count === 1 ? names[0] : '',
+      packageNames: count > 0 ? names : []
+    });
     const spinner = document.getElementById('composer-console-spinner');
     if (spinner) spinner.classList.add('hidden');
 
     if (res && res.success) {
       appendConsoleLog('\n✔ Update completed successfully!');
-      showToast(name ? `✔ Successfully updated ${name}!` : '✔ All packages updated!');
+      if (count === 1) {
+        showToast(`✔ Successfully updated ${names[0]}!`);
+      } else if (count > 1) {
+        showToast(`✔ Successfully updated ${count} packages!`);
+      } else {
+        showToast('✔ All packages updated!');
+      }
       await loadComposerTab(true);
     } else {
       appendConsoleLog(`\n❌ Update failed: ${res ? res.error : 'Unknown error'}`);
@@ -1431,4 +1616,8 @@ async function handleUpdateComposerPackage(name = '') {
     appendConsoleLog(`\n❌ Error: ${err.message}`);
     showToast(`Error: ${err.message}`, true);
   }
+}
+
+async function handleUpdateComposerPackage(name = '') {
+  return handleUpdateComposerPackages(name ? [name] : []);
 }

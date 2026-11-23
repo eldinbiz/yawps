@@ -84,6 +84,7 @@ function fetchLatestComposerVersion() {
   return new Promise((resolve, reject) => {
     https.get('https://getcomposer.org/versions', {
       headers: { 'User-Agent': 'YAWPS-PHP-Switcher' },
+      family: 4,
       timeout: 5000
     }, (res) => {
       if (res.statusCode !== 200) {
@@ -147,7 +148,7 @@ async function getComposerStatus() {
       args = [composerPhar, '--version'];
     } else if (composerBat) {
       cmd = 'cmd.exe';
-      args = ['/c', composerBat, '--version'];
+      args = ['/c', composerBat, '--version', '--no-ansi'];
     }
 
     if (cmd) {
@@ -155,7 +156,7 @@ async function getComposerStatus() {
         PATH: `${CURRENT_LINK};${BIN_DIR};${process.env.PATH}`
       });
       const check = spawnSync(cmd, args, { windowsHide: true, encoding: 'utf8', env: runEnv });
-      const out = (check.stdout || '') + (check.stderr || '');
+      const out = ((check.stdout || '') + (check.stderr || '')).replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
       const match = out.match(/Composer (?:version )?([0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[a-zA-Z0-9.]+)?)(?: \(([^\)]+)\))? ([0-9]{4}-[0-9]{2}-[0-9]{2})?/i);
       if (match) {
         version = match[1];
@@ -546,13 +547,30 @@ function installComposerGlobalPackage(pkgName, version, onProgress) {
   return runComposerCommand(['global', 'require', spec, '--no-interaction'], onProgress);
 }
 
+function removeComposerGlobalPackages(pkgNames, onProgress) {
+  const list = Array.isArray(pkgNames)
+    ? pkgNames.map(p => (p || '').trim()).filter(Boolean)
+    : [(pkgNames || '').trim()].filter(Boolean);
+  if (list.length === 0) return Promise.reject(new Error('No package names specified'));
+  return runComposerCommand(['global', 'remove', ...list, '--no-interaction'], onProgress);
+}
+
 function removeComposerGlobalPackage(pkgName, onProgress) {
-  return runComposerCommand(['global', 'remove', (pkgName || '').trim(), '--no-interaction'], onProgress);
+  return removeComposerGlobalPackages(pkgName, onProgress);
+}
+
+function updateComposerGlobalPackages(pkgNames, onProgress) {
+  const list = Array.isArray(pkgNames)
+    ? pkgNames.map(p => (p || '').trim()).filter(Boolean)
+    : (pkgNames ? [(pkgNames || '').trim()].filter(Boolean) : []);
+  const args = list.length > 0
+    ? ['global', 'update', ...list, '--no-interaction']
+    : ['global', 'update', '--no-interaction'];
+  return runComposerCommand(args, onProgress);
 }
 
 function updateComposerGlobalPackage(pkgName, onProgress) {
-  const args = pkgName ? ['global', 'update', pkgName.trim(), '--no-interaction'] : ['global', 'update', '--no-interaction'];
-  return runComposerCommand(args, onProgress);
+  return updateComposerGlobalPackages(pkgName, onProgress);
 }
 
 function toggleComposerGlobalBinPath(enable) {
@@ -578,6 +596,8 @@ module.exports = {
   getComposerGlobalPackages,
   installComposerGlobalPackage,
   removeComposerGlobalPackage,
+  removeComposerGlobalPackages,
   updateComposerGlobalPackage,
+  updateComposerGlobalPackages,
   toggleComposerGlobalBinPath
 };

@@ -52,7 +52,9 @@ const {
   getComposerGlobalPackages,
   installComposerGlobalPackage,
   removeComposerGlobalPackage,
+  removeComposerGlobalPackages,
   updateComposerGlobalPackage,
+  updateComposerGlobalPackages,
   toggleComposerGlobalBinPath
 } = require('../core/composer');
 
@@ -257,7 +259,8 @@ ipcMain.handle('install-composer-global-package', async (event, payload = {}) =>
 });
 
 ipcMain.handle('remove-composer-global-package', async (event, payload = {}) => {
-  return removeComposerGlobalPackage(payload.packageName, (line) => {
+  const pkgs = payload.packageNames || payload.packageName;
+  return removeComposerGlobalPackages(pkgs, (line) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('composer-log', { text: line });
     }
@@ -265,7 +268,8 @@ ipcMain.handle('remove-composer-global-package', async (event, payload = {}) => 
 });
 
 ipcMain.handle('update-composer-global-package', async (event, payload = {}) => {
-  return updateComposerGlobalPackage(payload.packageName, (line) => {
+  const pkgs = payload.packageNames || payload.packageName;
+  return updateComposerGlobalPackages(pkgs, (line) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('composer-log', { text: line });
     }
