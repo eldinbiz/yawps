@@ -2,26 +2,99 @@ schema: spec-driven
 skillsScope: project
 
 context: |
-  Target platform: Windows 10 and Windows 11 (windows/amd64) running strictly with standard user permissions (zero UAC elevation, no administrator rights).
-  Dual runtime architecture sharing src/gui/renderer/: Go/Wails v2 (primary: main.go, app.go, pkg/) and Node/Electron (src/, bin/).
-  Keep Go and Node/Electron CLI + backend feature parity and src/gui/renderer/bridge.js bindings aligned unless a change explicitly targets only one runtime.
-  Preserve zero-UAC portable build support (build.sh / build.cmd with .tools/) and legacy %USERPROFILE%\.win-php fallback compatibility alongside %USERPROFILE%\.yawps.
+  Project: YAWPS (Yet Another Windows PHP Switcher, v0.1.0) — portable PHP & Composer version manager for Windows.
+
+  ## Target Platform & Zero-UAC Invariants
+  - Target OS: Windows 10/11 (windows/amd64); Win11 at major == 10 && build >= 22000. Strict zero-UAC / standard-user execution (build/windows/wails.exe.manifest omits requestedExecutionLevel elevation).
+  - OS Gate (runs before CLI/GUI parsing, exit 1 on non-Windows/Linux or < Win 10):
+    - Go: AssertWindows10OrAbove (pkg/core/oscheck.go) calls ntdll.dll!RtlGetVersion (10.0.19045 fallback on error) + user32.dll!MessageBoxW in GUI mode.
+    - Node/Electron: assertWindows10OrAbove (src/core/osCheck.js) checks process.platform === 'win32' + os.release(), showing Electron dialog.showErrorBox (app.quit()) or PowerShell MessageBox; NSIS customInit (build/installer.nsh) enforces ${AtLeastWin10}.
+  - Zero-UAC mechanisms: NTFS junctions (cmd.exe /c mklink /J in Go; fs.symlinkSync(..., 'junction') in Node) and User PATH (HKCU\Environment\Path via golang.org/x/sys/windows/registry + user32.dll!SendMessageTimeoutW WM_SETTINGCHANGE in Go; PowerShell [Environment]::Get/SetEnvironmentVariable('Path', 'User') in Node).
+
+  ## Concrete Tech Stack & Versions
+  - Go / Wails (v0.1.0): Go 1.27.0 (go.mod), github.com/wailsapp/wails/v2 v2.17.0 (go-webview2 v1.0.22, labstack/echo/v4 v4.15.3, go-ole v1.3.0), golang.org/x/sys v0.49.0, Windows DLLs (ntdll.dll, kernel32.dll, user32.dll).
+  - Node / Electron (0.1.0): Node.js >=22.12.0 (locked commander/electron; CI "24"), electron ^45.0.0, electron-builder ^26.18.0, commander ^15.0.0, cli-table3 ^0.6.5, picocolors ^1.1.1 (package-lock.json retains orphaned devDependency chalk ^6.0.1 absent from package.json).
+  - Shared Frontend SPA: Vanilla HTML5/CSS3/ES6+ DOM JS (src/gui/renderer/{index.html,styles.css,app.js,bridge.js}) without bundler (wails.json frontend:install/build empty), plus @wailsapp/runtime 2.0.0 and generated src/gui/renderer/wailsjs/ (App.js, App.d.ts, models.ts — 15 model classes: 13 core, 2 main).
+
+  ## Dual-Runtime Architecture
+  - Go/Wails (primary): main.go (//go:embed all:src/gui/renderer, kernel32.dll!AttachConsole(-1) + CONOUT$ fallback for CLI; Wails window 1100x780, min 900x640, title "YAWPS - Yet Another Windows PHP Switcher", #0f172a), app.go (24 RPCs + 4 events), pkg/cli/cli.go, pkg/core/*.go (9 files).
+  - Node/Electron (secondary): bin/{yawps,win-php}.js, {yawps,win-php}.{cmd,ps1}, src/cli/index.js, src/gui/main.js (1100x780, min 900x640, contextIsolation: true, nodeIntegration: false, setWindowOpenHandler -> shell.openExternal, title 'Win PHP Switcher'), src/gui/preload.js, src/core/*.js (9 files). Both share src/gui/renderer/ via window.api (bridge.js / preload.js).
+
+  ## Storage Precedence & External Integrations
+  - BASE_DIR precedence: YAWPS_HOME > WIN_PHP_HOME > %USERPROFILE%\.win-php (only if .win-php exists and %USERPROFILE%\.yawps does not) > %USERPROFILE%\.yawps.
+  - Subpaths under BASE_DIR: EnsureDirectories creates baseDir, versions/ (php-<ver>-<type>-<arch>/), downloads/ (cached .zip), and bin/ (composer.phar, composer.bat, POSIX composer sh shim); sibling paths are current (NTFS junction) and config.json (path/helpers exist in both runtimes, currently unused).
+  - COMPOSER_HOME precedence: COMPOSER_HOME env > %USERPROFILE%\.composer (if exists) > %APPDATA%\Composer (if exists) > %USERPROFILE%\.composer. Global bin: <COMPOSER_HOME>/vendor/bin; caches: %LOCALAPPDATA%\Composer\cache and <COMPOSER_HOME>\cache.
+  - Endpoints: https://windows.php.net/downloads/releases/releases.json (+ /archives/ zip fallback & SHA256 verify; filters version, source, *pack*); IPv4-enforced (tcp4 / family: 4) https://getcomposer.org/versions + default-transport composer.phar download (default http.Client / https.get); https://packagist.org/packages/<name> GUI links.
+
+  ## Canonical window.api Contract (24 RPCs + 4 Events)
+  - 24 RPCs across bridge.js, preload.js, app.go, src/gui/main.js, wailsjs/go/main/App.{js,d.ts}: getState, fetchRemoteReleases, switchVersion, installVersion, checkUpdates, updateVersion, getExtensions, setExtensionStatus, getDirectives, updateDirectives, fixPath, removePath, uninstallVersion, fullCleanup, openFolder, getComposerStatus, installComposer, updateComposer, uninstallComposer, getComposerGlobalPackages, installComposerGlobalPackage, removeComposerGlobalPackage, updateComposerGlobalPackage, toggleComposerGlobalBinPath. (fullCleanup is unused by app.js.)
+  - 4 event channels (onInstallProgress, onUpdateProgress, onComposerProgress, onComposerLog): install-progress, update-progress, composer-progress, composer-log.
+
+  ## Canonical DTO Field Schemas
+  - WindowsVersionInfo: isWindows, isSupported, major, minor, build, kernel, osName, errorMessage (Node omits major, minor, build on non-Windows).
+  - StateResult: current (VersionInfo|null), installed (VersionInfo[]), pathStatus (PathStatus), osInfo (WindowsVersionInfo), currentLink.
+  - SwitchResult: success, target (VersionInfo|null), current (VersionInfo|null), pathStatus (PathStatus).
+  - VersionInfo: id, path, version, type (nts|ts), arch (x64|x86), isActive, phpExe, phpIni (Node getCurrentVersion omits isActive, phpExe, phpIni).
+  - ReleaseInfo: id, branch, version, type, compiler, arch, zipName, url, archiveUrl, sha256, size (Node adds mtime; sha256 null vs "" in Go).
+  - PathStatus: currentLink, isInUserPath, activePhpLocations, isPrimary (Go FixPath/RemovePath/SwitchVersion can return nil->null activePhpLocations when empty).
+  - ExtensionInfo: id, name, dll, category, description, isZend, enabled.
+  - Directives: Go returns 7 dotted keys (memory_limit, upload_max_filesize, post_max_size, max_execution_time, display_errors, date.timezone, opcache.enable) & UpdateDirectives returns bool; Node returns 10 snake_case keys (adds max_input_time, error_reporting, opcache_enable_cli; maps date_timezone/opcache_enable) & returns refreshed object.
+  - UpdateItem: Go {currentVersion: inst.ID, latestVersion, release, hasUpdate}; Node {installedId, currentVersion: item.version, latestVersion, type, arch, isActive, release}.
+  - InstallResult: targetDir, alreadyInstalled, release. UpdateResult: Go *InstallResult; Node {updated, oldVersion?, newVersion?, switched?, message?, currentVersion?}.
+  - UninstallResult: success, target, wasActive, switchedTo, deletedCacheFiles.
+  - CleanupResult: Go {baseDirDeleted, pathRemoved, junctionRemoved}; Node {success, pathRemoved, baseDirDeleted}.
+  - ComposerStatus (15 fields): installed, version, releaseDate, location, pharPath, isYawpsManaged, latestVersion, isUpToDate, activePhp, activePhpPath, composerHome, globalBinDir, isBinInPath, isGlobalBinInPath, packagesCount.
+  - ComposerOperationResult: success, output, error? (Node omits error).
+  - ComposerUninstallOptions: removeBin (true), removeFromPath (true), cleanCache (true), purgePackages (false), removeGlobalBinFromPath (false).
+  - ComposerUninstallResult: success, executablesDeleted, pathCleaned, cacheDeleted, packagesPurged, globalBinPathRemoved, deletedPaths, message.
+  - ComposerGlobalPackage: name, version, constraint, description, homepage, license, binaries, time, isOutdated, latest (Node omits isOutdated/latest, homepage/time if non-locked, constraint if locked-only).
+  - Events: Progress {stage, percent, message, receivedBytes, totalBytes} (Node omits message on PHP download ticks and bytes on transitions); composer-log {text}.
+
+  ## Option A Baseline Parity & Known Touchpoints (TODO.md)
+  - Directives mismatch: app.js reads/writes snake_case date_timezone/opcache_enable (Node keyMap), breaking Wails read (resets OPcache Off / UTC) and save (Go writes raw bogus opcache_enable/date_timezone into php.ini).
+  - UpdateVersion/CheckUpdates mismatch: app.js:779 expects {updated, newVersion} (Node), breaking under Go *core.InstallResult.
+  - removePath / env remove: Go removes User PATH only; Node also unlinks current NTFS junction.
+  - Initial php.ini defaults: Go uncomments extension_dir="ext" only; Node sets date.timezone=UTC and enables 8 extensions.
+  - CLI parity gaps: update [version] (check-only Go vs executes Node); cleanup purgeAll default (false Go vs true + TTY prompt Node); list-remote/install (--x86 & 15-cap Go vs --no-use & full list Node); uninstall (rm alias, --no-switch, -y/--yes/--force, TTY prompt Node); cache clean [version] (Go ignores arg); composer require -v (Node vs Go ""); Go version/-v vs Commander -V.
+  - Other touchpoints: Electron title ('Win PHP Switcher'); GetExtensions ignores missing php.ini in Go vs throws in Node; OpenFolder() opens versions/ instead of baseDir; Download tab hides x86; unused config.json; composer.go unsynchronized strings.Builder pipe race; installer.go swallowed computeSHA256 errors; PathStatus.activePhpLocations nil/null risk; Node ComposerOperationResult.error omission; Go AddDirectoryToUserPath writes REG_SZ over REG_EXPAND_SZ.
+
+  ## Build, Packaging, CI & Testing Baseline
+  - Portable builds: build.sh & build.cmd (CMD fallback skips System32\bash.exe), .tools/go/ + auto-compiled .tools/wails@v2.17.0, -upx, dist/yawps.exe; wails.json, build/windows/{info.json,wails.exe.manifest}; Electron portable + NSIS (package.json, build/installer.nsh); CI .github/workflows/build-windows.yml.
+  - Testing: zero automated tests (GOOS=windows GOARCH=amd64 go test ./... -> [no test files]; no package.json test script; node_modules/ and openspec CLI absent in Linux devbox). Linux cross-checks: GOOS=windows GOARCH=amd64 go vet ./... and node --check on 16 hand-authored JS files (18 incl. wailsjs/).
+
+  ## Canonical 9-Capability Registry (openspec/specs/<capability>/spec.md)
+  - platform-runtime-and-storage
+  - php-release-catalog-and-installer
+  - php-version-switching-and-path
+  - php-ini-and-extension-management
+  - php-patch-updater
+  - composer-lifecycle-and-packages
+  - desktop-gui-workspace
+  - cli-interface
+  - portable-build-and-packaging
 
 rules:
   proposal:
-    - State explicitly whether the change affects Go/Wails, Node/Electron, the shared UI, or all of them.
-    - Note any Windows OS APIs, NTFS directory junctions, User PATH registry edits, or zero-UAC constraints.
+    - "State explicitly whether the change affects Go/Wails (main.go, app.go, pkg/), Node/Electron (bin/, src/), the shared UI (src/gui/renderer/), build/packaging, or all of them."
+    - "Map affected behavior to the 9 canonical capabilities in openspec/specs/<capability>/spec.md (or justify any new capability)."
+    - "Note any Windows OS APIs, NTFS directory junctions, User PATH registry edits (HKCU\\Environment\\Path, WM_SETTINGCHANGE), or zero-UAC constraints."
   specs:
-    - Include scenarios covering Windows error/fallback behavior and CLI/GUI parity where applicable.
+    - "Include scenarios covering Windows error/fallback behavior (OS gate abort, archive fallback, offline Composer fallback) and CLI/GUI parity where applicable."
+    - "For Option A baseline fidelity or parity-sensitive behavior, capture exact Go/Wails vs. Node/Electron vs. UI behavior inside dedicated Runtime Parity '#### Scenario:' blocks so requirement body text stays concise."
+    - "Follow OpenSpec 2.1.1 --strict format: '# <Capability> Specification', '## Purpose' (>= 50 chars, non-TBD), '## Requirements' (NO delta headers in main specs), unique '### Requirement: <Name>', 'SHALL' or 'MUST' on the first physical body line, total requirement body text <= 500 chars before the first '#### Scenario:', and '>= 1' '#### Scenario: <Name>' with '- **WHEN**' / '- **GIVEN**' and '- **THEN**' bullets."
   design:
-    - Document bridge.js, app.go, and src/gui/preload.js contract changes whenever IPC or Wails bindings change.
+    - "Document src/gui/renderer/bridge.js, app.go, src/gui/preload.js, src/gui/main.js, and generated src/gui/renderer/wailsjs/ (App.js, App.d.ts, models.ts) whenever IPC methods, events, or Wails bindings change."
+    - "Include canonical DTO schemas and serialization contracts (Directives, UpdateItem, InstallResult/UpdateResult, VersionInfo, PathStatus, CleanupResult, ComposerStatus, ComposerOperationResult, progress/log events) to prevent frontend/backend drift."
   tasks:
-    - Include runtime-appropriate verification steps (e.g., Windows-targeted go vet / build checks and CLI smoke checks).
+    - "Include Windows-targeted static checks (GOOS=windows GOARCH=amd64 go vet ./..., node --check on modified JS files across bin/*.js, src/cli/*.js, src/core/*.js, src/gui/*.js, src/gui/renderer/*.js), Windows build/CLI smoke checks, and unit tests (*_test.go / node:test via GOOS=windows GOARCH=amd64 go test ./... and node --test) since the baseline has zero automated tests."
 
 operations:
   apply:
     guidance:
-      - Run GOOS=windows GOARCH=amd64 go vet ./... when Go files change, and keep Go and Node/Electron parity unless scoped otherwise.
+      - "Run GOOS=windows GOARCH=amd64 go vet ./... when Go files change and node --check on modified JS files (bin/*.js, src/cli/*.js, src/core/*.js, src/gui/*.js, src/gui/renderer/*.js)."
+      - "Run existing unit tests (GOOS=windows GOARCH=amd64 go test ./... and node --test) and add *_test.go or node:test coverage when implementing or modifying core or CLI logic."
+      - "Maintain dual-runtime Go/Wails and Node/Electron parity and keep src/gui/renderer/wailsjs/ aligned with app.go unless explicitly scoped to one runtime."
+      - "Update TODO.md whenever known runtime parity debt or live Wails/UI contract bugs are resolved or introduced."
   archive:
     guidance:
-      - Run openspec validate --all --strict before archiving and summarize the shipped changes.
+      - "Run openspec validate --all --strict before archiving and summarize shipped changes across affected capabilities and runtimes."
